@@ -1,0 +1,140 @@
+# Parolla WebSocket Server Project Rules
+
+## Environment Requirements
+- Node.js version: >= 18.0.0
+- Package manager: npm or yarn
+- Operating System: Cross-platform (Windows, macOS, Linux)
+
+## Project Structure
+```
+parolla-ws/
+├── src/
+│   ├── config/       # Configuration files
+│   ├── constants/    # Constants and enums
+│   ├── handlers/     # WebSocket event handlers
+│   ├── models/       # Data models
+│   ├── services/     # Business logic and external services
+│   ├── state/        # Game state management
+│   ├── utils/        # Helper functions
+│   └── server.js     # Main application entry
+```
+
+## Code Style Guidelines
+
+### Function Pattern
+```javascript
+/**
+ * Function description
+ * @param {Type} paramName - Parameter description
+ * @returns {Type} Return value description
+ */
+function functionName(param) {
+  // Implementation
+}
+```
+
+### Error Handling Pattern
+```javascript
+try {
+  // Async operation
+  await someAsyncFunction();
+} catch (error) {
+  console.error('Context-specific error message:', error.message);
+  // Handle or propagate error
+}
+```
+
+### WebSocket Message Pattern
+```javascript
+{
+  type: MessageType.ENUM_VALUE,
+  payload: {
+    // Message-specific data
+  }
+}
+```
+
+## Git Guidelines
+
+### Branch Naming
+- feature/feature-name
+- bugfix/bug-description
+- hotfix/urgent-fix
+- release/version-number
+
+### Commit Message Format
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+Types:
+- feat: New feature
+- fix: Bug fix
+- docs: Documentation
+- style: Code style changes
+- refactor: Code refactoring
+- test: Adding tests
+- chore: Build process or auxiliary tools
+
+### Version Control
+- Create pull requests for all changes
+- Require code review before merging
+- Keep commits atomic and focused
+- Write meaningful commit messages
+
+## Testing
+- Write unit tests for services
+- Write integration tests for WebSocket handlers
+- Test WebSocket connections with mock clients
+
+## Security
+- Use environment variables for sensitive data
+- Validate all incoming WebSocket messages
+- Implement proper token-based authentication
+- Handle WebSocket disconnections gracefully
+
+## Code Quality
+- Use ESLint for code linting
+- Follow airbnb-base style guide
+- Maximum line length: 100 characters
+- Use meaningful variable and function names
+- Document complex logic with comments
+
+## Performance
+- Implement proper error handling
+- Clean up WebSocket connections on disconnect
+- Use appropriate data structures for game state
+- Optimize broadcast messages
+
+## Development Workflow
+1. Create feature branch
+2. Implement changes
+3. Write/update tests
+4. Run linter
+5. Create pull request
+6. Code review
+7. Merge to main branch
+
+## Deployment
+- Use PM2 for process management
+- Set up proper logging
+- Configure environment variables
+- Monitor WebSocket connections
+- Handle process signals properly
+
+## Documentation
+- Keep README.md up to date
+- Document API endpoints
+- Document WebSocket message types
+- Include setup instructions
+- Document environment variables
+
+## Dependencies
+- Minimize external dependencies
+- Keep dependencies up to date
+- Document dependency purposes
+- Use exact versions in package.json 
