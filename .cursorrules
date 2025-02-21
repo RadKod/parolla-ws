@@ -71,7 +71,7 @@ try {
 <footer>
 ```
 
-Types:
+Github Commit Types:
 - feat: New feature
 - fix: Bug fix
 - docs: Documentation
