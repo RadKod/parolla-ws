@@ -291,9 +291,14 @@ async function handleConnection(wss, ws, req) {
 
     // İlk oyuncu bağlandığında oyunu başlat
     if (gameState.players.size === 1) {
+      // Oyun durumu sıfırlanmışsa yeni soruya geç
       if (!gameState.currentQuestion || !gameState.lastQuestionTime) {
-        // Oyun durumu sıfırlanmışsa yeni soruya geç
-        sendNewQuestion();
+        // Kısa bir gecikme ile yeni soru gönder (oyuncunun bağlantısının tam oturması için)
+        setTimeout(() => {
+          if (gameState.players.size > 0) {
+            sendNewQuestion();
+          }
+        }, 1000);
       } else {
         const timeInfo = getRemainingTime(gameState.lastQuestionTime);
         
@@ -320,7 +325,12 @@ async function handleConnection(wss, ws, req) {
           
           // Eğer bekleme süresi de bitmişse yeni soruya geç
           if (waitingTimeInfo.remaining <= 0) {
-            sendNewQuestion();
+            // Kısa bir gecikme ile yeni soru gönder
+            setTimeout(() => {
+              if (gameState.players.size > 0) {
+                sendNewQuestion();
+              }
+            }, 1000);
           } else {
             sendToPlayer(ws, {
               type: MessageType.WAITING_NEXT,

@@ -30,6 +30,22 @@ async function initializeGame() {
  * Yeni bir soru gönderir
  */
 function sendNewQuestion() {
+  // Hiç oyuncu yoksa oyunu başlatma
+  if (gameState.players.size === 0) {
+    if (gameState.timeUpdateInterval) {
+      clearInterval(gameState.timeUpdateInterval);
+      gameState.timeUpdateInterval = null;
+    }
+    if (gameState.roundTimer) {
+      clearTimeout(gameState.roundTimer);
+      gameState.roundTimer = null;
+    }
+    gameState.currentQuestion = null;
+    gameState.lastQuestionTime = null;
+    gameState.waitingStartTime = null;
+    return;
+  }
+
   if (gameState.questionIndex >= gameState.questions.length) {
     handleGameRestart();
     return;
@@ -69,6 +85,12 @@ function sendNewQuestion() {
 
   // Soru süresi dolduğunda
   gameState.roundTimer = setTimeout(() => {
+    // Son bir kontrol daha yap
+    if (gameState.players.size === 0) {
+      clearTimeout(gameState.roundTimer);
+      gameState.roundTimer = null;
+      return;
+    }
     handleTimeUp();
   }, gameState.ROUND_TIME);
 }
