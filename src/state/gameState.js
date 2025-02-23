@@ -40,6 +40,9 @@ const gameState = {
   // Bekleme süresi için interval
   waitingInterval: null,
 
+  // Süre doldu işlemi devam ediyor mu
+  isHandlingTimeUp: false,
+
   // Oyun ayarları
   ROUND_TIME,
   MAX_LIVES

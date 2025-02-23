@@ -54,6 +54,7 @@ function sendNewQuestion() {
   gameState.currentQuestion = gameState.questions[gameState.questionIndex];
   gameState.lastQuestionTime = Date.now();
   gameState.waitingStartTime = null;
+  gameState.isHandlingTimeUp = false;
 
   // Round bazlı durumları sıfırla
   gameState.roundLives.clear();
@@ -85,7 +86,9 @@ function sendNewQuestion() {
 
   // Soru süresi dolduğunda
   gameState.roundTimer = setTimeout(() => {
-    handleTimeUp();
+    if (!gameState.isHandlingTimeUp) {
+      handleTimeUp();
+    }
   }, gameState.ROUND_TIME);
 }
 
@@ -99,18 +102,36 @@ function startTimeUpdateInterval() {
     gameState.timeUpdateInterval = null;
   }
 
+  // Başlangıç süresini kontrol et
+  const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+  if (timeInfo.remaining <= 0) {
+    handleTimeUp();
+    return;
+  }
+
+  // İlk güncellemeyi hemen gönder
+  broadcast(gameState.wss, {
+    type: MessageType.TIME_UPDATE,
+    time: timeInfo
+  });
+
+  // Sonraki güncellemeler için interval başlat
   gameState.timeUpdateInterval = setInterval(() => {
-    const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+    const currentTimeInfo = getRemainingTime(gameState.lastQuestionTime);
     
     broadcast(gameState.wss, {
       type: MessageType.TIME_UPDATE,
-      time: timeInfo
+      time: currentTimeInfo
     });
 
-    if (timeInfo.remaining <= 0) {
+    if (currentTimeInfo.remaining <= 0) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
-      handleTimeUp();
+      
+      // handleTimeUp sadece bir kez çağrılsın
+      if (!gameState.isHandlingTimeUp) {
+        handleTimeUp();
+      }
     }
   }, 1000);
 }
@@ -119,63 +140,74 @@ function startTimeUpdateInterval() {
  * Soru süresi dolduğunda yapılacak işlemler
  */
 function handleTimeUp() {
-  // Tüm zamanlayıcıları temizle
-  if (gameState.roundTimer) {
-    clearTimeout(gameState.roundTimer);
-    gameState.roundTimer = null;
-  }
+  // Eğer zaten işleniyorsa çık
+  if (gameState.isHandlingTimeUp) return;
+  gameState.isHandlingTimeUp = true;
 
-  if (gameState.timeUpdateInterval) {
-    clearInterval(gameState.timeUpdateInterval);
-    gameState.timeUpdateInterval = null;
-  }
+  try {
+    // Tüm zamanlayıcıları temizle
+    if (gameState.roundTimer) {
+      clearTimeout(gameState.roundTimer);
+      gameState.roundTimer = null;
+    }
 
-  if (gameState.waitingInterval) {
-    clearInterval(gameState.waitingInterval);
-    gameState.waitingInterval = null;
-  }
+    if (gameState.timeUpdateInterval) {
+      clearInterval(gameState.timeUpdateInterval);
+      gameState.timeUpdateInterval = null;
+    }
 
-  // Tüm oyunculara doğru cevabı gönder
-  broadcast(gameState.wss, {
-    type: MessageType.TIME_UP,
-    correctAnswer: gameState.currentQuestion.answer
-  });
+    if (gameState.waitingInterval) {
+      clearInterval(gameState.waitingInterval);
+      gameState.waitingInterval = null;
+    }
 
-  gameState.waitingStartTime = Date.now();
-  gameState.questionIndex++;
-
-  // Bekleme süresi için interval başlat
-  const sendWaitingUpdate = () => {
-    const timeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-    
+    // Tüm oyunculara doğru cevabı gönder
     broadcast(gameState.wss, {
-      type: MessageType.WAITING_NEXT,
-      time: timeInfo
+      type: MessageType.TIME_UP,
+      correctAnswer: gameState.currentQuestion.answer
     });
 
-    if (timeInfo.remaining <= 0) {
+    gameState.waitingStartTime = Date.now();
+    gameState.questionIndex++;
+
+    // Bekleme süresi için interval başlat
+    const sendWaitingUpdate = () => {
+      const timeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+      
+      broadcast(gameState.wss, {
+        type: MessageType.WAITING_NEXT,
+        time: timeInfo
+      });
+
+      if (timeInfo.remaining <= 0) {
+        if (gameState.waitingInterval) {
+          clearInterval(gameState.waitingInterval);
+          gameState.waitingInterval = null;
+        }
+        gameState.isHandlingTimeUp = false;
+        sendNewQuestion();
+      }
+    };
+
+    // İlk güncellemeyi hemen gönder
+    sendWaitingUpdate();
+
+    // Sonraki güncellemeleri interval ile gönder
+    gameState.waitingInterval = setInterval(sendWaitingUpdate, 1000);
+
+    // Güvenlik için maksimum bekleme süresi sonunda interval'i temizle
+    setTimeout(() => {
       if (gameState.waitingInterval) {
         clearInterval(gameState.waitingInterval);
         gameState.waitingInterval = null;
       }
+      gameState.isHandlingTimeUp = false;
       sendNewQuestion();
-    }
-  };
-
-  // İlk güncellemeyi hemen gönder
-  sendWaitingUpdate();
-
-  // Sonraki güncellemeleri interval ile gönder
-  gameState.waitingInterval = setInterval(sendWaitingUpdate, 1000);
-
-  // Güvenlik için maksimum bekleme süresi sonunda interval'i temizle
-  setTimeout(() => {
-    if (gameState.waitingInterval) {
-      clearInterval(gameState.waitingInterval);
-      gameState.waitingInterval = null;
-      sendNewQuestion();
-    }
-  }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
+    }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
+  } catch (error) {
+    console.error('handleTimeUp hatası:', error);
+    gameState.isHandlingTimeUp = false;
+  }
 }
 
 /**
