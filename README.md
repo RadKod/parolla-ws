@@ -16,8 +16,11 @@ Parolla kelime oyunu için gerçek zamanlı WebSocket sunucusu. Bu sunucu, oyunc
 - Node.js >= 18.0.0
 - npm veya yarn
 - PM2 (production için)
+- Docker (opsiyonel)
 
 ## Kurulum
+
+### Normal Kurulum
 
 1. Repoyu klonlayın:
 ```bash
@@ -39,10 +42,34 @@ cp .env-example .env
 
 4. `.env` dosyasını düzenleyin:
 ```env
-PORT=8080
+PORT=1881
 HOST=localhost
 API_URL=http://parolla-backend.test/api/v1
 JWT_SECRET=your_jwt_secret_key_here
+```
+
+### Docker ile Kurulum
+
+1. Docker imajını oluşturun:
+```bash
+docker build -t parolla-ws .
+```
+
+2. Docker container'ı çalıştırın:
+```bash
+docker run -d \
+  --name parolla-ws \
+  -p 1881:1881 \
+  -e PORT=1881 \
+  -e HOST=0.0.0.0 \
+  -e API_URL=http://parolla-backend.test/api/v1 \
+  -e JWT_SECRET=your_jwt_secret_key_here \
+  parolla-ws
+```
+
+Docker Compose ile çalıştırmak için:
+```bash
+docker-compose up -d
 ```
 
 ## Geliştirme
@@ -56,6 +83,8 @@ yarn dev
 ```
 
 ## Production
+
+### Normal Deployment
 
 Production ortamında çalıştırmak için:
 
@@ -71,12 +100,30 @@ PM2 ile çalıştırmak için:
 pm2 start src/server.js --name "parolla-ws"
 ```
 
+### Docker Deployment
+
+Production ortamında Docker ile çalıştırmak için:
+
+```bash
+# Docker container'ı başlat
+docker start parolla-ws
+
+# Container loglarını görüntüle
+docker logs -f parolla-ws
+
+# Container'ı durdur
+docker stop parolla-ws
+
+# Container'ı yeniden başlat
+docker restart parolla-ws
+```
+
 ## WebSocket Bağlantısı
 
 WebSocket sunucusuna bağlanmak için:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080?token=your_jwt_token');
+const ws = new WebSocket('ws://localhost:1881?token=your_jwt_token');
 ```
 
 ## WebSocket Mesaj Tipleri
@@ -107,6 +154,8 @@ const ws = new WebSocket('ws://localhost:8080?token=your_jwt_token');
 
 ## Hata Ayıklama
 
+### Normal Deployment
+
 Hata loglarını görüntülemek için:
 
 ```bash
@@ -115,6 +164,19 @@ pm2 logs parolla-ws
 
 # Uygulama logları
 tail -f logs/app.log
+```
+
+### Docker Deployment
+
+```bash
+# Container logları
+docker logs -f parolla-ws
+
+# Container durumu
+docker ps -a | grep parolla-ws
+
+# Container detayları
+docker inspect parolla-ws
 ```
 
 ## Katkıda Bulunma
