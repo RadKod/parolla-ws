@@ -30,6 +30,22 @@ async function initializeGame() {
  * Yeni bir soru gönderir
  */
 function sendNewQuestion() {
+  // Önceki zamanlayıcıları temizle
+  if (gameState.roundTimer) {
+    clearTimeout(gameState.roundTimer);
+    gameState.roundTimer = null;
+  }
+
+  if (gameState.timeUpdateInterval) {
+    clearInterval(gameState.timeUpdateInterval);
+    gameState.timeUpdateInterval = null;
+  }
+
+  if (gameState.waitingInterval) {
+    clearInterval(gameState.waitingInterval);
+    gameState.waitingInterval = null;
+  }
+
   if (gameState.questionIndex >= gameState.questions.length) {
     handleGameRestart();
     return;
@@ -77,8 +93,10 @@ function sendNewQuestion() {
  * Süre güncellemesi için interval başlatır
  */
 function startTimeUpdateInterval() {
+  // Önceki interval varsa temizle
   if (gameState.timeUpdateInterval) {
     clearInterval(gameState.timeUpdateInterval);
+    gameState.timeUpdateInterval = null;
   }
 
   gameState.timeUpdateInterval = setInterval(() => {
@@ -92,6 +110,7 @@ function startTimeUpdateInterval() {
     if (timeInfo.remaining <= 0) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
+      handleTimeUp();
     }
   }, 1000);
 }
@@ -100,8 +119,21 @@ function startTimeUpdateInterval() {
  * Soru süresi dolduğunda yapılacak işlemler
  */
 function handleTimeUp() {
-  clearInterval(gameState.timeUpdateInterval);
-  gameState.timeUpdateInterval = null;
+  // Tüm zamanlayıcıları temizle
+  if (gameState.roundTimer) {
+    clearTimeout(gameState.roundTimer);
+    gameState.roundTimer = null;
+  }
+
+  if (gameState.timeUpdateInterval) {
+    clearInterval(gameState.timeUpdateInterval);
+    gameState.timeUpdateInterval = null;
+  }
+
+  if (gameState.waitingInterval) {
+    clearInterval(gameState.waitingInterval);
+    gameState.waitingInterval = null;
+  }
 
   // Tüm oyunculara doğru cevabı gönder
   broadcast(gameState.wss, {
@@ -113,8 +145,6 @@ function handleTimeUp() {
   gameState.questionIndex++;
 
   // Bekleme süresi için interval başlat
-  let waitingInterval = null;
-
   const sendWaitingUpdate = () => {
     const timeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
     
@@ -124,9 +154,9 @@ function handleTimeUp() {
     });
 
     if (timeInfo.remaining <= 0) {
-      if (waitingInterval) {
-        clearInterval(waitingInterval);
-        waitingInterval = null;
+      if (gameState.waitingInterval) {
+        clearInterval(gameState.waitingInterval);
+        gameState.waitingInterval = null;
       }
       sendNewQuestion();
     }
@@ -136,13 +166,13 @@ function handleTimeUp() {
   sendWaitingUpdate();
 
   // Sonraki güncellemeleri interval ile gönder
-  waitingInterval = setInterval(sendWaitingUpdate, 1000);
+  gameState.waitingInterval = setInterval(sendWaitingUpdate, 1000);
 
   // Güvenlik için maksimum bekleme süresi sonunda interval'i temizle
   setTimeout(() => {
-    if (waitingInterval) {
-      clearInterval(waitingInterval);
-      waitingInterval = null;
+    if (gameState.waitingInterval) {
+      clearInterval(gameState.waitingInterval);
+      gameState.waitingInterval = null;
       sendNewQuestion();
     }
   }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
@@ -245,6 +275,11 @@ async function handleGameRestart() {
   if (gameState.timeUpdateInterval) {
     clearInterval(gameState.timeUpdateInterval);
     gameState.timeUpdateInterval = null;
+  }
+
+  if (gameState.waitingInterval) {
+    clearInterval(gameState.waitingInterval);
+    gameState.waitingInterval = null;
   }
 
   // Yeni soruları yükle ve oyunu başlat

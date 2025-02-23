@@ -37,6 +37,9 @@ const gameState = {
   // Süre güncellemesi için interval
   timeUpdateInterval: null,
 
+  // Bekleme süresi için interval
+  waitingInterval: null,
+
   // Oyun ayarları
   ROUND_TIME,
   MAX_LIVES
