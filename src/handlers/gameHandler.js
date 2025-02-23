@@ -115,8 +115,31 @@ function startTimeUpdateInterval() {
     clearInterval(gameState.timeUpdateInterval);
   }
 
+  // İlk süre bilgisini hesapla
+  const initialTimeInfo = getRemainingTime(gameState.lastQuestionTime);
+  
+  // Eğer süre zaten bitmişse
+  if (initialTimeInfo.remaining <= 0) {
+    handleTimeUp();
+    return;
+  }
+
+  // İlk süre güncellemesini hemen gönder
+  broadcast(gameState.wss, {
+    type: MessageType.TIME_UPDATE,
+    time: initialTimeInfo
+  });
+
   gameState.timeUpdateInterval = setInterval(() => {
+    // Her interval'da süreyi tekrar hesapla
     const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+    
+    // Hiç oyuncu kalmadıysa interval'ı temizle
+    if (gameState.players.size === 0) {
+      clearInterval(gameState.timeUpdateInterval);
+      gameState.timeUpdateInterval = null;
+      return;
+    }
     
     // Süre devam ediyorsa güncelleme gönder
     if (timeInfo.remaining > 0) {
@@ -125,8 +148,8 @@ function startTimeUpdateInterval() {
         time: timeInfo
       });
     } 
-    // Süre tam bittiyse interval'ı temizle
-    else if (timeInfo.remaining === 0) {
+    // Süre tam bittiyse interval'ı temizle ve time_up'a geç
+    else {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
       handleTimeUp();
@@ -138,8 +161,14 @@ function startTimeUpdateInterval() {
     if (gameState.timeUpdateInterval) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
+      
+      // Son bir kontrol daha yap
+      const finalTimeInfo = getRemainingTime(gameState.lastQuestionTime);
+      if (finalTimeInfo.remaining <= 0) {
+        handleTimeUp();
+      }
     }
-  }, gameState.ROUND_TIME + 1000); // 1 saniye ekstra güvenlik payı
+  }, initialTimeInfo.remaining + 1000); // Kalan süre + 1 saniye güvenlik payı
 }
 
 /**
