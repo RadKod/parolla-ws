@@ -3,6 +3,7 @@ const { broadcast, sendToPlayer } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const { MAX_LIVES, CORRECT_ANSWER_SCORE, NEXT_QUESTION_DELAY } = require('../config/game.config');
 const { getUnlimitedQuestions } = require('../services/questionService');
+const { isAnswerCorrect } = require('../utils/stringUtils');
 const gameState = require('../state/gameState');
 
 /**
@@ -179,7 +180,19 @@ function handleAnswer(player, answer) {
     return;
   }
 
-  const isCorrect = answer.toLowerCase() === gameState.currentQuestion.answer.toLowerCase();
+  // Cevabı küçük harfe çevir ve boşlukları temizle
+  const cleanAnswer = answer.toLowerCase().trim();
+  
+  // Doğru cevapları virgülle ayır ve her birini temizle
+  const correctAnswers = gameState.currentQuestion.answer
+    .toLowerCase()
+    .split(',')
+    .map(ans => ans.trim());
+
+  // Her bir alternatif cevap için kontrol et
+  const isCorrect = correctAnswers.some(correctAns => 
+    isAnswerCorrect(cleanAnswer, correctAns)
+  );
 
   if (!isCorrect) {
     player.lives--;
