@@ -1,6 +1,38 @@
 const { ROUND_TIME, MAX_LIVES } = require('../config/game.config');
 
 /**
+ * Oyuncu listesi yönetimi için yardımcı fonksiyonlar
+ */
+const playerManagement = {
+  // Aktif oyuncuları sırala (son bağlantı zamanına göre)
+  getSortedPlayers() {
+    return Array.from(gameState.players.values())
+      .sort((a, b) => b.lastConnectionTime - a.lastConnectionTime);
+  },
+
+  // Oyuncu sayısını al
+  getPlayerCount() {
+    return gameState.players.size;
+  },
+
+  // Aktif oyuncuları al
+  getActivePlayers() {
+    return Array.from(gameState.players.values())
+      .filter(p => p.ws.readyState === 1); // WebSocket.OPEN = 1
+  },
+
+  // Oyuncuyu güncelle
+  updatePlayer(playerId, updates) {
+    const player = gameState.players.get(playerId);
+    if (player) {
+      Object.assign(player, updates);
+      return true;
+    }
+    return false;
+  }
+};
+
+/**
  * Oyun durumunu tutan state objesi
  */
 const gameState = {
@@ -39,7 +71,10 @@ const gameState = {
 
   // Oyun ayarları
   ROUND_TIME,
-  MAX_LIVES
+  MAX_LIVES,
+
+  // Oyuncu yönetimi fonksiyonları
+  playerManagement
 };
 
 module.exports = gameState; 

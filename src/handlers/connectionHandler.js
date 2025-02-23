@@ -38,6 +38,14 @@ function handleDisconnect(playerId) {
       player.ws.terminate(); // force close
     }
 
+    // Oyuncunun mevcut durumunu kaydet
+    const currentState = {
+      lives: player.lives,
+      score: player.score,
+      is_permanent: player.is_permanent
+    };
+
+    // Oyuncuyu listeden kaldır
     gameState.players.delete(playerId);
     
     if (gameState.players.size === 0) {
@@ -61,13 +69,23 @@ function handleDisconnect(playerId) {
     broadcast(gameState.wss, {
       type: MessageType.PLAYER_LEFT,
       playerId: playerId,
+      message: `${player.name} oyundan ayrıldı`,
+      player: {
+        id: player.id,
+        name: player.name,
+        fingerprint: player.fingerprint,
+        is_permanent: player.is_permanent,
+        lives: player.lives,
+        score: player.score
+      },
       remainingPlayers: Array.from(gameState.players.values()).map(p => ({
         id: p.id,
         name: p.name,
         fingerprint: p.fingerprint,
         is_permanent: p.is_permanent,
         lives: p.lives,
-        score: p.score
+        score: p.score,
+        lastConnectionTime: p.lastConnectionTime
       }))
     });
   } catch (error) {
@@ -123,21 +141,40 @@ async function handleConnection(wss, ws, req) {
       if (existingPlayer.ws && existingPlayer.ws.readyState === WebSocket.OPEN) {
         existingPlayer.ws.terminate(); // force close
       }
+
+      // Önceki oyuncunun durumunu koru
+      const previousState = {
+        lives: existingPlayer.lives,
+        score: existingPlayer.score,
+        is_permanent: existingPlayer.is_permanent
+      };
+
       // Oyuncu listesinden kaldır
       gameState.players.delete(userData.id);
+      
       // Kapanmanın tamamlanmasını bekle
       await new Promise(resolve => setTimeout(resolve, 100));
-    }
 
-    // Oyuncuyu oluştur
-    const player = new Player(ws, userData);
+      // Yeni oyuncuyu önceki durumuyla oluştur
+      const player = new Player(ws, {
+        ...userData,
+        is_permanent: previousState.is_permanent
+      });
+      
+      // Önceki durumu geri yükle
+      player.lives = previousState.lives;
+      player.score = previousState.score;
+    } else {
+      // Yeni oyuncuyu oluştur
+      const player = new Player(ws, userData);
 
-    // Eğer mevcut round'da can durumu varsa onu kullan
-    if (gameState.currentQuestion) {
-      const roundKey = `${gameState.questionIndex}_${playerId}`;
-      const roundLives = gameState.roundLives.get(roundKey);
-      if (roundLives !== undefined) {
-        player.lives = roundLives;
+      // Eğer mevcut round'da can durumu varsa onu kullan
+      if (gameState.currentQuestion) {
+        const roundKey = `${gameState.questionIndex}_${playerId}`;
+        const roundLives = gameState.roundLives.get(roundKey);
+        if (roundLives !== undefined) {
+          player.lives = roundLives;
+        }
       }
     }
 
@@ -172,16 +209,42 @@ async function handleConnection(wss, ws, req) {
     // Oyuncuyu kaydet
     gameState.players.set(userData.id, player);
 
-    // Oyuncuya bilgilerini gönder
-    sendToPlayer(ws, {
-      type: MessageType.CONNECTED,
+    // Diğer oyunculara yeni oyuncunun katıldığını bildir
+    broadcast(gameState.wss, {
+      type: MessageType.PLAYER_JOINED,
+      message: `${player.name} oyuna katıldı`,
       player: {
         id: player.id,
         name: player.name,
         fingerprint: player.fingerprint,
         is_permanent: player.is_permanent,
         lives: player.lives,
-        score: player.score
+        score: player.score,
+        lastConnectionTime: player.lastConnectionTime
+      },
+      currentPlayers: Array.from(gameState.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        fingerprint: p.fingerprint,
+        is_permanent: p.is_permanent,
+        lives: p.lives,
+        score: p.score,
+        lastConnectionTime: p.lastConnectionTime
+      }))
+    }, [player.id]); // Yeni katılan oyuncuya gönderme
+
+    // Oyuncuya bilgilerini gönder
+    sendToPlayer(ws, {
+      type: MessageType.CONNECTED,
+      message: `Oyuna hoş geldin ${player.name}!`,
+      player: {
+        id: player.id,
+        name: player.name,
+        fingerprint: player.fingerprint,
+        is_permanent: player.is_permanent,
+        lives: player.lives,
+        score: player.score,
+        lastConnectionTime: player.lastConnectionTime
       },
       gameInfo: {
         roundTime: gameState.ROUND_TIME,
@@ -193,23 +256,11 @@ async function handleConnection(wss, ws, req) {
           fingerprint: p.fingerprint,
           is_permanent: p.is_permanent,
           lives: p.lives,
-          score: p.score
+          score: p.score,
+          lastConnectionTime: p.lastConnectionTime
         }))
       }
     });
-
-    // Diğer oyunculara yeni oyuncunun katıldığını bildir
-    broadcast(gameState.wss, {
-      type: MessageType.PLAYER_JOINED,
-      player: {
-        id: player.id,
-        name: player.name,
-        fingerprint: player.fingerprint,
-        is_permanent: player.is_permanent,
-        lives: player.lives,
-        score: player.score
-      }
-    }, [player.id]); // Yeni katılan oyuncuya gönderme
 
     // İlk oyuncu bağlandığında oyunu başlat
     if (gameState.players.size === 1 && !gameState.currentQuestion && gameState.questionIndex === 0) {
