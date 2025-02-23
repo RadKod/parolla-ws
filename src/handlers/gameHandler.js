@@ -5,6 +5,7 @@ const { MAX_LIVES, CORRECT_ANSWER_SCORE, NEXT_QUESTION_DELAY } = require('../con
 const { getUnlimitedQuestions } = require('../services/questionService');
 const { isAnswerCorrect } = require('../utils/stringUtils');
 const gameState = require('../state/gameState');
+const { composeGameEventLog, composeGameStatusLog } = require('../utils/logger');
 
 /**
  * Oyunu başlatır ve soruları yükler
@@ -32,6 +33,9 @@ async function initializeGame() {
 function sendNewQuestion() {
   // Hiç oyuncu yoksa oyunu başlatma
   if (gameState.players.size === 0) {
+    const gameStatus = composeGameStatusLog();
+    console.log('Game Status (No Players):', JSON.stringify(gameStatus, null, 2));
+
     if (gameState.timeUpdateInterval) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
@@ -93,6 +97,14 @@ function sendNewQuestion() {
     }
     handleTimeUp();
   }, gameState.ROUND_TIME);
+
+  // Yeni soru logu
+  const questionLog = composeGameEventLog('new_question', {
+    questionId: gameState.currentQuestion.id,
+    questionNumber: gameState.questionIndex + 1,
+    totalQuestions: gameState.questions.length
+  });
+  console.log('New Question:', JSON.stringify(questionLog, null, 2));
 }
 
 /**
@@ -194,6 +206,14 @@ function handleTimeUp() {
       }
     }
   }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
+
+  // Süre doldu logu
+  const timeUpLog = composeGameEventLog('time_up', {
+    questionId: gameState.currentQuestion.id,
+    questionNumber: gameState.questionIndex,
+    correctAnswer: gameState.currentQuestion.answer
+  });
+  console.log('Time Up:', JSON.stringify(timeUpLog, null, 2));
 }
 
 /**
@@ -263,6 +283,17 @@ function handleAnswer(player, answer) {
     gameState.roundCorrectAnswers.set(roundKey, true);
   }
 
+  // Cevap logu
+  const answerLog = composeGameEventLog('player_answer', {
+    playerId: player.id,
+    playerName: player.name,
+    answer: cleanAnswer,
+    isCorrect,
+    remainingLives: player.lives,
+    score: player.score
+  });
+  console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
+
   sendToPlayer(player.ws, {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
@@ -309,6 +340,10 @@ async function handleGameRestart() {
       message: 'Oyun yeniden başlatılamadı, lütfen daha sonra tekrar deneyin.'
     });
   }
+
+  // Oyun yeniden başlatma logu
+  const restartLog = composeGameEventLog('game_restart');
+  console.log('Game Restart:', JSON.stringify(restartLog, null, 2));
 }
 
 module.exports = {

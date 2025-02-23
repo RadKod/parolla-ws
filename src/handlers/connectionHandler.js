@@ -6,6 +6,7 @@ const { broadcast, sendToPlayer } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const gameState = require('../state/gameState');
 const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
+const { composePlayerEventLog, composeGameStatusLog } = require('../utils/logger');
 const url = require('url');
 
 /**
@@ -45,6 +46,10 @@ function handleDisconnect(playerId) {
       is_permanent: player.is_permanent
     };
 
+    // Log oluştur (oyuncu çıkmadan önce)
+    const disconnectLog = composePlayerEventLog('leave', player);
+    console.log('Player Disconnect:', JSON.stringify(disconnectLog, null, 2));
+
     // Oyuncuyu listeden kaldır
     gameState.players.delete(playerId);
     
@@ -65,6 +70,10 @@ function handleDisconnect(playerId) {
       gameState.lastQuestionTime = null;
       gameState.currentQuestion = null;
       gameState.questionIndex = 0;
+
+      // Oyun durumu logu
+      const gameStatus = composeGameStatusLog();
+      console.log('Game Status (All Players Left):', JSON.stringify(gameStatus, null, 2));
     }
 
     // Diğer oyunculara bildir
@@ -220,6 +229,14 @@ async function handleConnection(wss, ws, req) {
     // Oyuncuyu kaydet
     gameState.players.set(userData.id, player);
 
+    // Bağlantı logu
+    const connectLog = composePlayerEventLog('join', player);
+    console.log('Player Connect:', JSON.stringify(connectLog, null, 2));
+
+    // Oyun durumu logu
+    const gameStatus = composeGameStatusLog();
+    console.log('Game Status:', JSON.stringify(gameStatus, null, 2));
+
     // Diğer oyunculara yeni oyuncunun katıldığını bildir
     broadcast(gameState.wss, {
       type: MessageType.PLAYER_JOINED,
@@ -242,7 +259,12 @@ async function handleConnection(wss, ws, req) {
         score: p.score,
         lastConnectionTime: p.lastConnectionTime,
         isOnline: p.ws.readyState === WebSocket.OPEN
-      }))
+      })),
+      gameInfo: {
+        roundTime: gameState.ROUND_TIME,
+        maxLives: gameState.MAX_LIVES,
+        totalQuestions: gameState.questions.length
+      }
     }, [player.id]); // Yeni katılan oyuncuya gönderme
 
     // Sistem mesajını gönder
