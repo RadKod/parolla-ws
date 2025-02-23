@@ -7,29 +7,40 @@ const WebSocket = require('ws');
  * @param {Array<string>} [excludePlayerIds] Mesajı almayacak oyuncuların ID'leri
  */
 function broadcast(wss, message, excludePlayerIds = []) {
-  const jsonMessage = JSON.stringify(message);
-  
-  wss.clients.forEach(client => {
-    try {
-      if (client.readyState === WebSocket.OPEN) {
+  if (!wss || !wss.clients) {
+    console.error('Invalid WebSocket server or no clients');
+    return;
+  }
+
+  try {
+    const jsonMessage = JSON.stringify(message);
+    const clients = Array.from(wss.clients);
+    
+    for (const client of clients) {
+      try {
+        if (client.readyState !== WebSocket.OPEN) {
+          continue;
+        }
+
         // Player ID kontrolü
-        const playerId = client._playerId; // WebSocket nesnesine eklediğimiz özel alan
-        
-        // Eğer client exclude listesinde değilse mesajı gönder
-        if (!excludePlayerIds.includes(playerId)) {
-          client.send(jsonMessage);
+        const playerId = client._playerId;
+        if (!playerId || excludePlayerIds.includes(playerId)) {
+          continue;
+        }
+
+        client.send(jsonMessage);
+      } catch (error) {
+        console.error('Error sending to client:', error);
+        try {
+          client.terminate();
+        } catch (e) {
+          console.error('Client termination error:', e);
         }
       }
-    } catch (error) {
-      console.error('Broadcast error:', error);
-      // Hatalı client'ı kapat
-      try {
-        client.terminate();
-      } catch (e) {
-        console.error('Client termination error:', e);
-      }
     }
-  });
+  } catch (error) {
+    console.error('Broadcast error:', error);
+  }
 }
 
 /**
@@ -38,13 +49,21 @@ function broadcast(wss, message, excludePlayerIds = []) {
  * @param {Object} message Gönderilecek mesaj
  */
 function sendToPlayer(ws, message) {
+  if (!ws) {
+    console.error('Invalid WebSocket connection');
+    return;
+  }
+
   try {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open');
+      return;
     }
+
+    const jsonMessage = JSON.stringify(message);
+    ws.send(jsonMessage);
   } catch (error) {
     console.error('SendToPlayer error:', error);
-    // Hatalı bağlantıyı kapat
     try {
       ws.terminate();
     } catch (e) {
