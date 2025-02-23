@@ -20,7 +20,7 @@ function getRemainingTime(lastQuestionTime) {
     total: ROUND_TIME,
     elapsed,
     remaining,
-    percentage: Math.floor((remaining / ROUND_TIME) * 100)
+    percentage: Math.floor((elapsed / ROUND_TIME) * 100)
   };
 }
 
@@ -44,7 +44,7 @@ function getRemainingWaitingTime(waitingStartTime) {
     total: NEXT_QUESTION_DELAY,
     elapsed,
     remaining,
-    percentage: Math.floor((remaining / NEXT_QUESTION_DELAY) * 100)
+    percentage: Math.floor((elapsed / NEXT_QUESTION_DELAY) * 100)
   };
 }
 
