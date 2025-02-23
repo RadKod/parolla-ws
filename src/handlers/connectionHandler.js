@@ -69,7 +69,7 @@ function handleDisconnect(playerId) {
     broadcast(gameState.wss, {
       type: MessageType.PLAYER_LEFT,
       playerId: playerId,
-      message: `${player.name} oyundan ayrıldı`,
+      isPlayerUpdate: true,
       player: {
         id: player.id,
         name: player.name,
@@ -78,15 +78,23 @@ function handleDisconnect(playerId) {
         lives: player.lives,
         score: player.score
       },
-      remainingPlayers: Array.from(gameState.players.values()).map(p => ({
+      playerList: Array.from(gameState.players.values()).map(p => ({
         id: p.id,
         name: p.name,
         fingerprint: p.fingerprint,
         is_permanent: p.is_permanent,
         lives: p.lives,
         score: p.score,
-        lastConnectionTime: p.lastConnectionTime
+        lastConnectionTime: p.lastConnectionTime,
+        isOnline: p.ws.readyState === WebSocket.OPEN
       }))
+    });
+
+    // Sistem mesajını gönder
+    broadcast(gameState.wss, {
+      type: MessageType.SYSTEM_MESSAGE,
+      message: `${player.name} oyundan ayrıldı`,
+      messageType: 'player_left'
     });
   } catch (error) {
     console.error('Disconnect handling error:', error);
@@ -213,7 +221,7 @@ async function handleConnection(wss, ws, req) {
     // Diğer oyunculara yeni oyuncunun katıldığını bildir
     broadcast(gameState.wss, {
       type: MessageType.PLAYER_JOINED,
-      message: `${player.name} oyuna katıldı`,
+      isPlayerUpdate: true,
       player: {
         id: player.id,
         name: player.name,
@@ -223,21 +231,29 @@ async function handleConnection(wss, ws, req) {
         score: player.score,
         lastConnectionTime: player.lastConnectionTime
       },
-      currentPlayers: Array.from(gameState.players.values()).map(p => ({
+      playerList: Array.from(gameState.players.values()).map(p => ({
         id: p.id,
         name: p.name,
         fingerprint: p.fingerprint,
         is_permanent: p.is_permanent,
         lives: p.lives,
         score: p.score,
-        lastConnectionTime: p.lastConnectionTime
+        lastConnectionTime: p.lastConnectionTime,
+        isOnline: p.ws.readyState === WebSocket.OPEN
       }))
     }, [player.id]); // Yeni katılan oyuncuya gönderme
+
+    // Sistem mesajını gönder
+    broadcast(gameState.wss, {
+      type: MessageType.SYSTEM_MESSAGE,
+      message: `${player.name} oyuna katıldı`,
+      messageType: 'player_joined'
+    }, [player.id]);
 
     // Oyuncuya bilgilerini gönder
     sendToPlayer(ws, {
       type: MessageType.CONNECTED,
-      message: `Oyuna hoş geldin ${player.name}!`,
+      isPlayerUpdate: true,
       player: {
         id: player.id,
         name: player.name,
@@ -247,20 +263,28 @@ async function handleConnection(wss, ws, req) {
         score: player.score,
         lastConnectionTime: player.lastConnectionTime
       },
+      playerList: Array.from(gameState.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        fingerprint: p.fingerprint,
+        is_permanent: p.is_permanent,
+        lives: p.lives,
+        score: p.score,
+        lastConnectionTime: p.lastConnectionTime,
+        isOnline: p.ws.readyState === WebSocket.OPEN
+      })),
       gameInfo: {
         roundTime: gameState.ROUND_TIME,
         maxLives: gameState.MAX_LIVES,
-        totalQuestions: gameState.questions.length,
-        currentPlayers: Array.from(gameState.players.values()).map(p => ({
-          id: p.id,
-          name: p.name,
-          fingerprint: p.fingerprint,
-          is_permanent: p.is_permanent,
-          lives: p.lives,
-          score: p.score,
-          lastConnectionTime: p.lastConnectionTime
-        }))
+        totalQuestions: gameState.questions.length
       }
+    });
+
+    // Hoş geldin mesajını gönder
+    sendToPlayer(ws, {
+      type: MessageType.SYSTEM_MESSAGE,
+      message: `Oyuna hoş geldin ${player.name}!`,
+      messageType: 'welcome'
     });
 
     // İlk oyuncu bağlandığında oyunu başlat
