@@ -218,7 +218,6 @@ async function handleConnection(wss, ws, req) {
     // Mevcut soru varsa yeni bağlanan oyuncuya gönder
     else if (gameState.currentQuestion) {
       const timeInfo = getRemainingTime(gameState.lastQuestionTime);
-      const isQuestionActive = timeInfo.remaining > 0;
       
       // Mevcut soruyu gönder
       sendToPlayer(ws, {
@@ -237,8 +236,8 @@ async function handleConnection(wss, ws, req) {
         }
       });
 
-      // Eğer bekleme süresindeyse, bekleme süresini gönder
-      if (gameState.waitingStartTime) {
+      // Eğer bekleme süresindeyse ve soru süresi bitmişse, bekleme süresini gönder
+      if (gameState.waitingStartTime && timeInfo.remaining <= 0) {
         const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
         sendToPlayer(ws, {
           type: MessageType.WAITING_NEXT,
