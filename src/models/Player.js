@@ -1,8 +1,8 @@
 const { MAX_LIVES } = require('../config/game.config');
 
 class Player {
-  constructor(ws, userData) {
-    this.ws = ws;
+  constructor(socket, userData) {
+    this.socket = socket;
     this.id = userData.id;
     this.name = userData.name;
     this.fingerprint = userData.fingerprint;
