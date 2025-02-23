@@ -31,5 +31,8 @@ module.exports = {
   ANSWER_RESULT: 'answer_result',
   
   /** Oyuncunun canlarının bittiğini ve oyunun bittiğini bildirir */
-  GAME_OVER: 'game_over'
+  GAME_OVER: 'game_over',
+
+  /** Bir oyuncunun oyundan ayrıldığını bildirir */
+  PLAYER_LEFT: 'player_left'
 }; 

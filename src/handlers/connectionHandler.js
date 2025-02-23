@@ -57,9 +57,14 @@ async function handleConnection(wss, ws, req) {
 
   // Eğer aynı kullanıcının önceki bağlantısı varsa kapat
   const existingPlayer = gameState.players.get(userData.id);
-  if (existingPlayer && existingPlayer.ws.readyState === WebSocket.OPEN) {
-    existingPlayer.ws.close();
-    // Önceki bağlantının kapanmasını bekle
+  if (existingPlayer) {
+    // Önceki bağlantıyı kapat
+    if (existingPlayer.ws && existingPlayer.ws.readyState === WebSocket.OPEN) {
+      existingPlayer.ws.terminate(); // force close
+    }
+    // Oyuncu listesinden kaldır
+    gameState.players.delete(userData.id);
+    // Kapanmanın tamamlanmasını bekle
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
@@ -75,6 +80,35 @@ async function handleConnection(wss, ws, req) {
     }
   }
 
+  // Ping/Pong mekanizması kur
+  let isAlive = true;
+  const pingInterval = setInterval(() => {
+    if (!isAlive) {
+      clearInterval(pingInterval);
+      return ws.terminate();
+    }
+    isAlive = false;
+    ws.ping();
+  }, 30000);
+
+  ws.on('pong', () => {
+    isAlive = true;
+  });
+
+  // Bağlantı hatalarını dinle
+  ws.on('error', (error) => {
+    console.error('WebSocket connection error:', error);
+    clearInterval(pingInterval);
+    handleDisconnect(userData.id);
+  });
+
+  // Bağlantı kapandığında
+  ws.on('close', () => {
+    clearInterval(pingInterval);
+    handleDisconnect(userData.id);
+  });
+
+  // Oyuncuyu kaydet
   gameState.players.set(userData.id, player);
 
   // Oyuncuya bilgilerini gönder
@@ -142,9 +176,6 @@ async function handleConnection(wss, ws, req) {
       }
     }
   }
-
-  // Bağlantı kapandığında
-  ws.on('close', () => handleDisconnect(userData.id));
 }
 
 /**
@@ -156,8 +187,8 @@ function handleDisconnect(playerId) {
   if (!player) return;
 
   // WebSocket bağlantısını kapat
-  if (player.ws.readyState === WebSocket.OPEN) {
-    player.ws.close();
+  if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+    player.ws.terminate(); // force close
   }
 
   gameState.players.delete(playerId);
@@ -173,6 +204,12 @@ function handleDisconnect(playerId) {
       gameState.timeUpdateInterval = null;
     }
   }
+
+  // Diğer oyunculara bildir
+  broadcast(gameState.wss, {
+    type: MessageType.PLAYER_LEFT,
+    playerId: playerId
+  });
 }
 
 module.exports = {
