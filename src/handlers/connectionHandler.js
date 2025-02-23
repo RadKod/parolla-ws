@@ -41,7 +41,7 @@ function handleDisconnect(playerId) {
     // Oyuncuyu listeden kaldır
     gameState.players.delete(playerId);
     
-    // Eğer hiç oyuncu kalmadıysa oyunu sıfırla
+    // Eğer hiç oyuncu kalmadıysa sadece zamanlayıcıları temizle
     if (gameState.players.size === 0) {
       // Tüm zamanlayıcıları temizle
       if (gameState.roundTimer) {
@@ -52,11 +52,11 @@ function handleDisconnect(playerId) {
         clearInterval(gameState.timeUpdateInterval);
         gameState.timeUpdateInterval = null;
       }
-      // Oyun durumunu sıfırla
-      gameState.currentQuestion = null;
-      gameState.lastQuestionTime = null;
-      gameState.waitingStartTime = null;
-      gameState.questionIndex = 0;
+      
+      // Oyun durumunu koruyoruz, sadece zamanlayıcıları durduruyoruz
+      // gameState.currentQuestion, gameState.lastQuestionTime ve 
+      // gameState.questionIndex değerlerini koruyoruz
+      gameState.waitingStartTime = null; // Sadece bekleme süresini sıfırla
     }
 
     // Diğer oyunculara bildir
@@ -225,7 +225,7 @@ async function handleConnection(wss, ws, req) {
     }, [player.id]); // Yeni katılan oyuncuya gönderme
 
     // İlk oyuncu bağlandığında oyunu başlat
-    if (gameState.players.size === 1 && !gameState.currentQuestion) {
+    if (gameState.players.size === 1 && !gameState.currentQuestion && gameState.questionIndex === 0) {
       sendNewQuestion();
     } 
     // Mevcut soru varsa yeni bağlanan oyuncuya gönder
@@ -263,7 +263,17 @@ async function handleConnection(wss, ws, req) {
           type: MessageType.TIME_UPDATE,
           time: timeInfo
         });
+        
+        // Eğer interval yoksa başlat
+        if (!gameState.timeUpdateInterval) {
+          startTimeUpdateInterval();
+        }
       }
+    }
+    // Eğer oyun durmuş durumdaysa ve oyuncular varsa, kaldığı yerden devam et
+    else if (gameState.players.size > 0 && gameState.questionIndex > 0) {
+      // Yeni soruya geç
+      sendNewQuestion();
     }
   } catch (error) {
     console.error('Connection handling error:', error);
