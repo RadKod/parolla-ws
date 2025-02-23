@@ -129,6 +129,19 @@ async function handleConnection(wss, ws, req) {
     }
   });
 
+  // Diğer oyunculara yeni oyuncunun katıldığını bildir
+  broadcast(gameState.wss, {
+    type: MessageType.PLAYER_JOINED,
+    player: {
+      id: player.id,
+      name: player.name,
+      fingerprint: player.fingerprint,
+      is_permanent: player.is_permanent,
+      lives: player.lives,
+      score: player.score
+    }
+  }, [player.id]); // Yeni katılan oyuncuya gönderme
+
   // İlk oyuncu bağlandığında oyunu başlat
   if (gameState.players.size === 1 && !gameState.currentQuestion) {
     sendNewQuestion();
