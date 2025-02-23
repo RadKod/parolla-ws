@@ -84,13 +84,15 @@ function startTimeUpdateInterval() {
   gameState.timeUpdateInterval = setInterval(() => {
     const timeInfo = getRemainingTime(gameState.lastQuestionTime);
     
+    // Süre devam ediyorsa güncelleme gönder
     if (timeInfo.remaining > 0) {
       broadcast(gameState.wss, {
         type: MessageType.TIME_UPDATE,
         time: timeInfo
       });
-    } else {
-      // Süre bittiyse interval'ı temizle ve time_up'a geç
+    } 
+    // Süre tam bittiyse interval'ı temizle
+    else if (timeInfo.remaining === 0) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
       handleTimeUp();
@@ -102,7 +104,6 @@ function startTimeUpdateInterval() {
     if (gameState.timeUpdateInterval) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
-      handleTimeUp();
     }
   }, gameState.ROUND_TIME + 1000); // 1 saniye ekstra güvenlik payı
 }
@@ -150,8 +151,9 @@ function handleTimeUp() {
         type: MessageType.WAITING_NEXT,
         time: timeInfo
       });
-    } else {
-      // Süre bittiyse interval'ı temizle ve yeni soruya geç
+    } 
+    // Süre tam bittiyse yeni soruya geç
+    else if (timeInfo.remaining === 0) {
       clearInterval(waitingInterval);
       waitingInterval = null;
       sendNewQuestion();
@@ -163,7 +165,11 @@ function handleTimeUp() {
     if (waitingInterval) {
       clearInterval(waitingInterval);
       waitingInterval = null;
-      sendNewQuestion();
+      // Yeni soruya geçmeden önce son bir kontrol
+      const finalTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+      if (finalTimeInfo.remaining <= 0) {
+        sendNewQuestion();
+      }
     }
   }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
 }

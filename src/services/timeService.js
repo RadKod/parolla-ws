@@ -13,14 +13,15 @@ function getRemainingTime(lastQuestionTime) {
     percentage: 0
   };
   
-  const elapsed = Date.now() - lastQuestionTime;
+  const now = Date.now();
+  const elapsed = now - lastQuestionTime;
   const remaining = Math.max(0, ROUND_TIME - elapsed);
   
   return {
     total: ROUND_TIME,
     elapsed,
     remaining,
-    percentage: Math.floor((elapsed / ROUND_TIME) * 100)
+    percentage: Math.min(100, Math.floor((elapsed / ROUND_TIME) * 100))
   };
 }
 
@@ -37,14 +38,15 @@ function getRemainingWaitingTime(waitingStartTime) {
     percentage: 0
   };
   
-  const elapsed = Date.now() - waitingStartTime;
+  const now = Date.now();
+  const elapsed = now - waitingStartTime;
   const remaining = Math.max(0, NEXT_QUESTION_DELAY - elapsed);
   
   return {
     total: NEXT_QUESTION_DELAY,
     elapsed,
     remaining,
-    percentage: Math.floor((elapsed / NEXT_QUESTION_DELAY) * 100)
+    percentage: Math.min(100, Math.floor((elapsed / NEXT_QUESTION_DELAY) * 100))
   };
 }
 
