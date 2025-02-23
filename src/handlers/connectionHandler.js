@@ -35,34 +35,55 @@ function handleDisconnect(playerId) {
 
     // WebSocket bağlantısını kapat
     if (player.ws && player.ws.readyState === WebSocket.OPEN) {
-      player.ws.terminate(); // force close
+      try {
+        player.ws.terminate(); // force close
+      } catch (e) {
+        console.error('Error terminating connection:', e);
+      }
     }
 
     // Oyuncuyu listeden kaldır
     gameState.players.delete(playerId);
     
-    // Eğer hiç oyuncu kalmadıysa sadece zamanlayıcıları temizle
+    // Eğer hiç oyuncu kalmadıysa zamanlayıcıları temizle
     if (gameState.players.size === 0) {
       // Tüm zamanlayıcıları temizle
       if (gameState.roundTimer) {
-        clearTimeout(gameState.roundTimer);
-        gameState.roundTimer = null;
+        try {
+          clearTimeout(gameState.roundTimer);
+          gameState.roundTimer = null;
+        } catch (e) {
+          console.error('Error clearing round timer:', e);
+        }
       }
+      
       if (gameState.timeUpdateInterval) {
-        clearInterval(gameState.timeUpdateInterval);
-        gameState.timeUpdateInterval = null;
+        try {
+          clearInterval(gameState.timeUpdateInterval);
+          gameState.timeUpdateInterval = null;
+        } catch (e) {
+          console.error('Error clearing time update interval:', e);
+        }
       }
       
       // Oyun durumunu koruyoruz, sadece zamanlayıcıları durduruyoruz
-      // gameState.currentQuestion, gameState.lastQuestionTime ve 
-      // gameState.questionIndex değerlerini koruyoruz
+      // gameState.currentQuestion ve gameState.questionIndex değerlerini koruyoruz
       gameState.waitingStartTime = null; // Sadece bekleme süresini sıfırla
+      gameState.lastQuestionTime = Date.now(); // Süreyi güncelle
     }
 
     // Diğer oyunculara bildir
     broadcast(gameState.wss, {
       type: MessageType.PLAYER_LEFT,
-      playerId: playerId
+      playerId: playerId,
+      remainingPlayers: Array.from(gameState.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        fingerprint: p.fingerprint,
+        is_permanent: p.is_permanent,
+        lives: p.lives,
+        score: p.score
+      }))
     });
   } catch (error) {
     console.error('Disconnect handling error:', error);
@@ -231,6 +252,7 @@ async function handleConnection(wss, ws, req) {
     // Mevcut soru varsa yeni bağlanan oyuncuya gönder
     else if (gameState.currentQuestion) {
       const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+      const isQuestionActive = timeInfo.remaining > 0;
       
       // Mevcut soruyu gönder
       sendToPlayer(ws, {
@@ -252,13 +274,21 @@ async function handleConnection(wss, ws, req) {
       // Eğer bekleme süresindeyse, bekleme süresini gönder
       if (gameState.waitingStartTime) {
         const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-        sendToPlayer(ws, {
-          type: MessageType.WAITING_NEXT,
-          time: waitingTimeInfo
-        });
+        
+        // Eğer bekleme süresi hala devam ediyorsa
+        if (waitingTimeInfo.remaining > 0) {
+          sendToPlayer(ws, {
+            type: MessageType.WAITING_NEXT,
+            time: waitingTimeInfo
+          });
+        } else {
+          // Bekleme süresi bittiyse yeni soruya geç
+          sendNewQuestion();
+        }
       }
-      // Değilse ve süre devam ediyorsa, süre güncellemesini gönder
-      else if (timeInfo.remaining > 0) {
+      // Değilse ve soru süresi devam ediyorsa
+      else if (isQuestionActive) {
+        // Süre güncellemesini hemen gönder
         sendToPlayer(ws, {
           type: MessageType.TIME_UPDATE,
           time: timeInfo
@@ -269,9 +299,14 @@ async function handleConnection(wss, ws, req) {
           startTimeUpdateInterval();
         }
       }
+      // Soru süresi bittiyse ve bekleme süresinde değilse
+      else if (!gameState.waitingStartTime) {
+        // Yeni soruya geç
+        sendNewQuestion();
+      }
     }
     // Eğer oyun durmuş durumdaysa ve oyuncular varsa, kaldığı yerden devam et
-    else if (gameState.players.size > 0 && gameState.questionIndex > 0) {
+    else if (gameState.players.size > 0) {
       // Yeni soruya geç
       sendNewQuestion();
     }
