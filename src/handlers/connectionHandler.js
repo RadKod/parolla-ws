@@ -131,22 +131,18 @@ async function handleConnection(wss, ws, req) {
     // WebSocket nesnesine player ID'yi ekle
     ws._playerId = playerId;
 
-    // Eğer aynı kullanıcının önceki bağlantısı varsa kapat
-    const existingPlayer = gameState.players.get(playerId);
-    if (existingPlayer) {
-      // Önceki bağlantıyı kapat
-      if (existingPlayer.ws && existingPlayer.ws.readyState === WebSocket.OPEN) {
-        try {
-          existingPlayer.ws.terminate(); // force close
-        } catch (e) {
-          console.error('Error terminating existing connection:', e);
-        }
-      }
-      // Oyuncu listesinden kaldır
-      gameState.players.delete(playerId);
-      // Kapanmanın tamamlanmasını bekle
-      await new Promise(resolve => setTimeout(resolve, 100));
+  // Eğer aynı kullanıcının önceki bağlantısı varsa kapat
+  const existingPlayer = gameState.players.get(userData.id);
+  if (existingPlayer) {
+    // Önceki bağlantıyı kapat
+    if (existingPlayer.ws && existingPlayer.ws.readyState === WebSocket.OPEN) {
+      existingPlayer.ws.terminate(); // force close
     }
+    // Oyuncu listesinden kaldır
+    gameState.players.delete(userData.id);
+    // Kapanmanın tamamlanmasını bekle
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 
     // Oyuncuyu oluştur
     const player = new Player(ws, userData);
@@ -160,51 +156,36 @@ async function handleConnection(wss, ws, req) {
       }
     }
 
-    // Ping/Pong mekanizması kur
-    pingInterval = setInterval(() => {
-      if (!isAlive) {
-        clearInterval(pingInterval);
-        try {
-          ws.terminate();
-        } catch (e) {
-          console.error('Error terminating connection on ping timeout:', e);
-        }
-        return;
-      }
-      isAlive = false;
-      try {
-        ws.ping();
-      } catch (error) {
-        console.error('Ping error:', error);
-        clearInterval(pingInterval);
-        handleDisconnect(playerId);
-      }
-    }, 30000);
+  // Ping/Pong mekanizması kur
+  let isAlive = true;
+  const pingInterval = setInterval(() => {
+    if (!isAlive) {
+      clearInterval(pingInterval);
+      return ws.terminate();
+    }
+    isAlive = false;
+    ws.ping();
+  }, 30000);
 
-    ws.on('pong', () => {
-      isAlive = true;
-    });
+  ws.on('pong', () => {
+    isAlive = true;
+  });
 
-    // Bağlantı hatalarını dinle
-    ws.on('error', (error) => {
-      console.error('WebSocket connection error:', error);
-      if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-      handleDisconnect(playerId);
-    });
+  // Bağlantı hatalarını dinle
+  ws.on('error', (error) => {
+    console.error('WebSocket connection error:', error);
+    clearInterval(pingInterval);
+    handleDisconnect(userData.id);
+  });
 
-    // Bağlantı kapandığında
-    ws.on('close', (code, reason) => {
-      console.log(`WebSocket connection closed for player: ${playerId}, Code: ${code}, Reason: ${reason || 'No reason provided'}`);
-      if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-      handleDisconnect(playerId);
-    });
+  // Bağlantı kapandığında
+  ws.on('close', () => {
+    clearInterval(pingInterval);
+    handleDisconnect(userData.id);
+  });
 
-    // Oyuncuyu kaydet
-    gameState.players.set(playerId, player);
+  // Oyuncuyu kaydet
+  gameState.players.set(userData.id, player);
 
     // Oyuncuya bilgilerini gönder
     sendToPlayer(ws, {
@@ -271,59 +252,62 @@ async function handleConnection(wss, ws, req) {
         }
       });
 
-      // Eğer bekleme süresindeyse, bekleme süresini gönder
-      if (gameState.waitingStartTime) {
-        const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-        
-        // Eğer bekleme süresi hala devam ediyorsa
-        if (waitingTimeInfo.remaining > 0) {
-          sendToPlayer(ws, {
-            type: MessageType.WAITING_NEXT,
-            time: waitingTimeInfo
-          });
-        } else {
-          // Bekleme süresi bittiyse yeni soruya geç
-          sendNewQuestion();
-        }
+    // Eğer bekleme süresindeyse, bekleme süresini gönder
+    if (gameState.waitingStartTime) {
+      const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+      sendToPlayer(ws, {
+        type: MessageType.WAITING_NEXT,
+        time: waitingTimeInfo
+      });
+    }
+    // Değilse ve süre devam ediyorsa, süre güncellemesini başlat
+    else if (timeInfo.remaining > 0) {
+      // Süre güncellemesini hemen gönder
+      sendToPlayer(ws, {
+        type: MessageType.TIME_UPDATE,
+        time: timeInfo
+      });
+      
+      // Eğer interval yoksa başlat
+      if (!gameState.timeUpdateInterval) {
+        startTimeUpdateInterval();
       }
-      // Değilse ve soru süresi devam ediyorsa
-      else if (isQuestionActive) {
-        // Süre güncellemesini hemen gönder
-        sendToPlayer(ws, {
-          type: MessageType.TIME_UPDATE,
-          time: timeInfo
-        });
-        
-        // Eğer interval yoksa başlat
-        if (!gameState.timeUpdateInterval) {
-          startTimeUpdateInterval();
-        }
-      }
-      // Soru süresi bittiyse ve bekleme süresinde değilse
-      else if (!gameState.waitingStartTime) {
-        // Yeni soruya geç
-        sendNewQuestion();
-      }
-    }
-    // Eğer oyun durmuş durumdaysa ve oyuncular varsa, kaldığı yerden devam et
-    else if (gameState.players.size > 0) {
-      // Yeni soruya geç
-      sendNewQuestion();
-    }
-  } catch (error) {
-    console.error('Connection handling error:', error);
-    if (pingInterval) {
-      clearInterval(pingInterval);
-    }
-    try {
-      ws.terminate();
-    } catch (e) {
-      console.error('WebSocket termination error:', e);
-    }
-    if (playerId) {
-      handleDisconnect(playerId);
     }
   }
+}
+
+/**
+ * Bağlantı kapandığında yapılacak işlemler
+ * @param {string} playerId Oyuncu ID'si
+ */
+function handleDisconnect(playerId) {
+  const player = gameState.players.get(playerId);
+  if (!player) return;
+
+  // WebSocket bağlantısını kapat
+  if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+    player.ws.terminate(); // force close
+  }
+
+  gameState.players.delete(playerId);
+  
+  if (gameState.players.size === 0) {
+    // Tüm zamanlayıcıları temizle
+    if (gameState.roundTimer) {
+      clearInterval(gameState.roundTimer);
+      gameState.roundTimer = null;
+    }
+    if (gameState.timeUpdateInterval) {
+      clearInterval(gameState.timeUpdateInterval);
+      gameState.timeUpdateInterval = null;
+    }
+  }
+
+  // Diğer oyunculara bildir
+  broadcast(gameState.wss, {
+    type: MessageType.PLAYER_LEFT,
+    playerId: playerId
+  });
 }
 
 module.exports = {

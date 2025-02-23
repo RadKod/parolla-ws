@@ -34,8 +34,5 @@ module.exports = {
   GAME_OVER: 'game_over',
 
   /** Bir oyuncunun oyundan ayrıldığını bildirir */
-  PLAYER_LEFT: 'player_left',
-
-  /** Yeni bir oyuncunun oyuna katıldığını bildirir */
-  PLAYER_JOINED: 'player_joined'
+  PLAYER_LEFT: 'player_left'
 }; 
