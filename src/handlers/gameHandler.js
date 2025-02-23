@@ -30,22 +30,6 @@ async function initializeGame() {
  * Yeni bir soru gönderir
  */
 function sendNewQuestion() {
-  // Önceki zamanlayıcıları temizle
-  if (gameState.roundTimer) {
-    clearTimeout(gameState.roundTimer);
-    gameState.roundTimer = null;
-  }
-
-  if (gameState.timeUpdateInterval) {
-    clearInterval(gameState.timeUpdateInterval);
-    gameState.timeUpdateInterval = null;
-  }
-
-  if (gameState.waitingInterval) {
-    clearInterval(gameState.waitingInterval);
-    gameState.waitingInterval = null;
-  }
-
   if (gameState.questionIndex >= gameState.questions.length) {
     handleGameRestart();
     return;
@@ -54,7 +38,6 @@ function sendNewQuestion() {
   gameState.currentQuestion = gameState.questions[gameState.questionIndex];
   gameState.lastQuestionTime = Date.now();
   gameState.waitingStartTime = null;
-  gameState.isHandlingTimeUp = false;
 
   // Round bazlı durumları sıfırla
   gameState.roundLives.clear();
@@ -86,9 +69,7 @@ function sendNewQuestion() {
 
   // Soru süresi dolduğunda
   gameState.roundTimer = setTimeout(() => {
-    if (!gameState.isHandlingTimeUp) {
-      handleTimeUp();
-    }
+    handleTimeUp();
   }, gameState.ROUND_TIME);
 }
 
@@ -96,42 +77,21 @@ function sendNewQuestion() {
  * Süre güncellemesi için interval başlatır
  */
 function startTimeUpdateInterval() {
-  // Önceki interval varsa temizle
   if (gameState.timeUpdateInterval) {
     clearInterval(gameState.timeUpdateInterval);
-    gameState.timeUpdateInterval = null;
   }
 
-  // Başlangıç süresini kontrol et
-  const timeInfo = getRemainingTime(gameState.lastQuestionTime);
-  if (timeInfo.remaining <= 0) {
-    handleTimeUp();
-    return;
-  }
-
-  // İlk güncellemeyi hemen gönder
-  broadcast(gameState.wss, {
-    type: MessageType.TIME_UPDATE,
-    time: timeInfo
-  });
-
-  // Sonraki güncellemeler için interval başlat
   gameState.timeUpdateInterval = setInterval(() => {
-    const currentTimeInfo = getRemainingTime(gameState.lastQuestionTime);
+    const timeInfo = getRemainingTime(gameState.lastQuestionTime);
     
     broadcast(gameState.wss, {
       type: MessageType.TIME_UPDATE,
-      time: currentTimeInfo
+      time: timeInfo
     });
 
-    if (currentTimeInfo.remaining <= 0) {
+    if (timeInfo.remaining <= 0) {
       clearInterval(gameState.timeUpdateInterval);
       gameState.timeUpdateInterval = null;
-      
-      // handleTimeUp sadece bir kez çağrılsın
-      if (!gameState.isHandlingTimeUp) {
-        handleTimeUp();
-      }
     }
   }, 1000);
 }
@@ -140,74 +100,52 @@ function startTimeUpdateInterval() {
  * Soru süresi dolduğunda yapılacak işlemler
  */
 function handleTimeUp() {
-  // Eğer zaten işleniyorsa çık
-  if (gameState.isHandlingTimeUp) return;
-  gameState.isHandlingTimeUp = true;
+  clearInterval(gameState.timeUpdateInterval);
+  gameState.timeUpdateInterval = null;
 
-  try {
-    // Tüm zamanlayıcıları temizle
-    if (gameState.roundTimer) {
-      clearTimeout(gameState.roundTimer);
-      gameState.roundTimer = null;
-    }
+  // Tüm oyunculara doğru cevabı gönder
+  broadcast(gameState.wss, {
+    type: MessageType.TIME_UP,
+    correctAnswer: gameState.currentQuestion.answer
+  });
 
-    if (gameState.timeUpdateInterval) {
-      clearInterval(gameState.timeUpdateInterval);
-      gameState.timeUpdateInterval = null;
-    }
+  gameState.waitingStartTime = Date.now();
+  gameState.questionIndex++;
 
-    if (gameState.waitingInterval) {
-      clearInterval(gameState.waitingInterval);
-      gameState.waitingInterval = null;
-    }
+  // Bekleme süresi için interval başlat
+  let waitingInterval = null;
 
-    // Tüm oyunculara doğru cevabı gönder
+  const sendWaitingUpdate = () => {
+    const timeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+    
     broadcast(gameState.wss, {
-      type: MessageType.TIME_UP,
-      correctAnswer: gameState.currentQuestion.answer
+      type: MessageType.WAITING_NEXT,
+      time: timeInfo
     });
 
-    gameState.waitingStartTime = Date.now();
-    gameState.questionIndex++;
-
-    // Bekleme süresi için interval başlat
-    const sendWaitingUpdate = () => {
-      const timeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-      
-      broadcast(gameState.wss, {
-        type: MessageType.WAITING_NEXT,
-        time: timeInfo
-      });
-
-      if (timeInfo.remaining <= 0) {
-        if (gameState.waitingInterval) {
-          clearInterval(gameState.waitingInterval);
-          gameState.waitingInterval = null;
-        }
-        gameState.isHandlingTimeUp = false;
-        sendNewQuestion();
+    if (timeInfo.remaining <= 0) {
+      if (waitingInterval) {
+        clearInterval(waitingInterval);
+        waitingInterval = null;
       }
-    };
-
-    // İlk güncellemeyi hemen gönder
-    sendWaitingUpdate();
-
-    // Sonraki güncellemeleri interval ile gönder
-    gameState.waitingInterval = setInterval(sendWaitingUpdate, 1000);
-
-    // Güvenlik için maksimum bekleme süresi sonunda interval'i temizle
-    setTimeout(() => {
-      if (gameState.waitingInterval) {
-        clearInterval(gameState.waitingInterval);
-        gameState.waitingInterval = null;
-      }
-      gameState.isHandlingTimeUp = false;
       sendNewQuestion();
-    }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
-  } catch (error) {
-    console.error('handleTimeUp hatası:', error);
-    gameState.isHandlingTimeUp = false;
-  }
+    }
+  };
+
+  // İlk güncellemeyi hemen gönder
+  sendWaitingUpdate();
+
+  // Sonraki güncellemeleri interval ile gönder
+  waitingInterval = setInterval(sendWaitingUpdate, 1000);
+
+  // Güvenlik için maksimum bekleme süresi sonunda interval'i temizle
+  setTimeout(() => {
+    if (waitingInterval) {
+      clearInterval(waitingInterval);
+      waitingInterval = null;
+      sendNewQuestion();
+    }
+  }, NEXT_QUESTION_DELAY + 1000); // 1 saniye ekstra güvenlik payı
 }
 
 /**
@@ -307,11 +245,6 @@ async function handleGameRestart() {
   if (gameState.timeUpdateInterval) {
     clearInterval(gameState.timeUpdateInterval);
     gameState.timeUpdateInterval = null;
-  }
-
-  if (gameState.waitingInterval) {
-    clearInterval(gameState.waitingInterval);
-    gameState.waitingInterval = null;
   }
 
   // Yeni soruları yükle ve oyunu başlat

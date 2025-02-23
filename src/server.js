@@ -8,6 +8,22 @@ const { getUserFromAPI } = require('./services/authService');
 const gameState = require('./state/gameState');
 const url = require('url');
 
+/**
+ * Token'ı temizler (Bearer prefix'ini kaldırır)
+ * @param {string} token Ham token
+ * @returns {string} Temizlenmiş token
+ */
+function cleanToken(token) {
+  if (!token) return null;
+  
+  // Bearer prefix'ini kaldır
+  if (token.startsWith('Bearer ')) {
+    return token.slice(7).trim();
+  }
+  
+  return token.trim();
+}
+
 // WebSocket sunucusunu oluştur
 const wss = new WebSocket.Server({ 
   port: PORT,
@@ -29,9 +45,9 @@ wss.on('connection', async (ws, req) => {
     // Mesajları dinle
     ws.on('message', async (message) => {
       try {
-        // URL'den token parametresini al
+        // URL'den token parametresini al ve temizle
         const { query } = url.parse(req.url, true);
-        const token = query.token;
+        const token = cleanToken(query.token);
         if (!token) return;
 
         const userData = await getUserFromAPI(token);

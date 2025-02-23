@@ -9,15 +9,31 @@ const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
 const url = require('url');
 
 /**
+ * Token'ı temizler (Bearer prefix'ini kaldırır)
+ * @param {string} token Ham token
+ * @returns {string} Temizlenmiş token
+ */
+function cleanToken(token) {
+  if (!token) return null;
+  
+  // Bearer prefix'ini kaldır
+  if (token.startsWith('Bearer ')) {
+    return token.slice(7).trim();
+  }
+  
+  return token.trim();
+}
+
+/**
  * Yeni bir WebSocket bağlantısını yönetir
  * @param {WebSocket.Server} wss WebSocket sunucusu
  * @param {WebSocket} ws WebSocket bağlantısı
  * @param {Object} req HTTP isteği
  */
 async function handleConnection(wss, ws, req) {
-  // URL'den token parametresini al
+  // URL'den token parametresini al ve temizle
   const { query } = url.parse(req.url, true);
-  const token = query.token;
+  const token = cleanToken(query.token);
 
   if (!token) {
     sendToPlayer(ws, {
