@@ -6,6 +6,7 @@ const { handleMessage } = require('./handlers/messageHandler');
 const { initializeGame } = require('./handlers/gameHandler');
 const { getUserFromAPI } = require('./services/authService');
 const gameState = require('./state/gameState');
+const url = require('url');
 
 // WebSocket sunucusunu oluştur
 const wss = new WebSocket.Server({ 
@@ -28,7 +29,9 @@ wss.on('connection', async (ws, req) => {
     // Mesajları dinle
     ws.on('message', async (message) => {
       try {
-        const token = req.headers['authorization']?.split(' ')[1];
+        // URL'den token parametresini al
+        const { query } = url.parse(req.url, true);
+        const token = query.token;
         if (!token) return;
 
         const userData = await getUserFromAPI(token);

@@ -71,6 +71,14 @@ PM2 ile çalıştırmak için:
 pm2 start src/server.js --name "parolla-ws"
 ```
 
+## WebSocket Bağlantısı
+
+WebSocket sunucusuna bağlanmak için:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080?token=your_jwt_token');
+```
+
 ## WebSocket Mesaj Tipleri
 
 ### Sunucudan Gelen Mesajlar

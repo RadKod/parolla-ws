@@ -6,6 +6,7 @@ const { broadcast, sendToPlayer } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const gameState = require('../state/gameState');
 const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
+const url = require('url');
 
 /**
  * Yeni bir WebSocket bağlantısını yönetir
@@ -14,7 +15,9 @@ const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
  * @param {Object} req HTTP isteği
  */
 async function handleConnection(wss, ws, req) {
-  const token = req.headers['authorization']?.split(' ')[1];
+  // URL'den token parametresini al
+  const { query } = url.parse(req.url, true);
+  const token = query.token;
 
   if (!token) {
     sendToPlayer(ws, {
