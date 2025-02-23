@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  parolla-ws:
+    build: .
+    container_name: parolla-ws
+    restart: always
+    ports:
+      - "1881:1881"
+    environment:
+      - NODE_ENV=production
+      - PORT=1881
+      - HOST=0.0.0.0
+      - API_URL=${API_URL}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./logs:/app/logs 
