@@ -55,6 +55,14 @@ async function handleConnection(wss, ws, req) {
     return;
   }
 
+  // Eğer aynı kullanıcının önceki bağlantısı varsa kapat
+  const existingPlayer = gameState.players.get(userData.id);
+  if (existingPlayer && existingPlayer.ws.readyState === WebSocket.OPEN) {
+    existingPlayer.ws.close();
+    // Önceki bağlantının kapanmasını bekle
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
   // Oyuncuyu oluştur
   const player = new Player(ws, userData);
 
@@ -122,6 +130,12 @@ async function handleConnection(wss, ws, req) {
     }
     // Değilse ve süre devam ediyorsa, süre güncellemesini başlat
     else if (timeInfo.remaining > 0) {
+      // Süre güncellemesini hemen gönder
+      sendToPlayer(ws, {
+        type: MessageType.TIME_UPDATE,
+        time: timeInfo
+      });
+      
       // Eğer interval yoksa başlat
       if (!gameState.timeUpdateInterval) {
         startTimeUpdateInterval();
@@ -138,6 +152,14 @@ async function handleConnection(wss, ws, req) {
  * @param {string} playerId Oyuncu ID'si
  */
 function handleDisconnect(playerId) {
+  const player = gameState.players.get(playerId);
+  if (!player) return;
+
+  // WebSocket bağlantısını kapat
+  if (player.ws.readyState === WebSocket.OPEN) {
+    player.ws.close();
+  }
+
   gameState.players.delete(playerId);
   
   if (gameState.players.size === 0) {
