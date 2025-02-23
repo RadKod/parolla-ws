@@ -103,6 +103,7 @@ async function handleConnection(wss, ws, req) {
   let pingInterval;
   let isAlive = true;
   let playerId = null;
+  let player = null;
 
   try {
     // URL'den token parametresini al ve temizle
@@ -156,7 +157,7 @@ async function handleConnection(wss, ws, req) {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Yeni oyuncuyu önceki durumuyla oluştur
-      const player = new Player(ws, {
+      player = new Player(ws, {
         ...userData,
         is_permanent: previousState.is_permanent
       });
@@ -166,7 +167,7 @@ async function handleConnection(wss, ws, req) {
       player.score = previousState.score;
     } else {
       // Yeni oyuncuyu oluştur
-      const player = new Player(ws, userData);
+      player = new Player(ws, userData);
 
       // Eğer mevcut round'da can durumu varsa onu kullan
       if (gameState.currentQuestion) {
