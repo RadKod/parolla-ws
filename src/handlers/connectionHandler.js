@@ -64,6 +64,12 @@ function handleDisconnect(playerId) {
         clearInterval(gameState.timeUpdateInterval);
         gameState.timeUpdateInterval = null;
       }
+
+      // Cleanup timeout'u temizle
+      if (gameState.timeUpdateCleanupTimeout) {
+        clearTimeout(gameState.timeUpdateCleanupTimeout);
+        gameState.timeUpdateCleanupTimeout = null;
+      }
       
       // Son oyuncu çıktığında oyun durumunu sıfırla
       gameState.waitingStartTime = null;
