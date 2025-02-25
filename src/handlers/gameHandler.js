@@ -87,8 +87,8 @@ function sendNewQuestion() {
 
   console.log(`Yeni soru gönderiliyor (ID: ${gameState.currentQuestion.id}), İzleyici sayısı: ${gameState.viewerCount || 0}`);
 
-  // Tüm oyunculara soruyu gönder
-  broadcast(gameState.wss, questionMessage);
+  // Tüm oyunculara soruyu gönder (izleyicilere gönderme)
+  broadcast(gameState.wss, questionMessage, [], false);
 
   // İzleyicilere de soruyu gönder
   if (gameState.viewerCount > 0) {
@@ -144,8 +144,8 @@ function startTimeUpdateInterval() {
     time: initialTimeInfo
   };
 
-  // İlk süre güncellemesini hemen gönder
-  broadcast(gameState.wss, timeUpdateMessage);
+  // İlk süre güncellemesini hemen gönder (izleyicilere gönderme)
+  broadcast(gameState.wss, timeUpdateMessage, [], false);
   
   // İzleyicilere de süre güncellemesini gönder
   if (gameState.viewerCount > 0) {
@@ -195,7 +195,7 @@ function startTimeUpdateInterval() {
         time: timeInfo
       };
       
-      broadcast(gameState.wss, timeUpdateMsg);
+      broadcast(gameState.wss, timeUpdateMsg, [], false);
       
       // İzleyicilere de süre güncellemesini gönder
       if (gameState.viewerCount > 0) {
@@ -266,8 +266,8 @@ function handleTimeUp() {
 
   console.log(`Süre doldu, doğru cevap: ${gameState.currentQuestion.answer}`);
 
-  // Tüm oyunculara doğru cevabı gönder
-  broadcast(gameState.wss, timeUpMessage);
+  // Tüm oyunculara doğru cevabı gönder (izleyicilere gönderme)
+  broadcast(gameState.wss, timeUpMessage, [], false);
   
   // İzleyicilere de doğru cevabı gönder
   if (gameState.viewerCount > 0) {
@@ -288,8 +288,8 @@ function handleTimeUp() {
 
   console.log(`Bekleme süresi başladı: ${NEXT_QUESTION_DELAY}ms`);
 
-  // İlk waiting_next güncellemesini hemen gönder
-  broadcast(gameState.wss, waitingMessage);
+  // İlk waiting_next güncellemesini hemen gönder (izleyicilere gönderme)
+  broadcast(gameState.wss, waitingMessage, [], false);
   
   // İzleyicilere de bekleme mesajını gönder
   if (gameState.viewerCount > 0) {
@@ -308,7 +308,7 @@ function handleTimeUp() {
         time: timeInfo
       };
       
-      broadcast(gameState.wss, waitingUpdateMsg);
+      broadcast(gameState.wss, waitingUpdateMsg, [], false);
       
       // İzleyicilere de bekleme güncellemesini gönder
       if (gameState.viewerCount > 0) {
@@ -441,7 +441,7 @@ async function handleGameRestart() {
   
   console.log('Oyun yeniden başlatılıyor...');
   
-  broadcast(gameState.wss, restartMessage);
+  broadcast(gameState.wss, restartMessage, [], false);
   
   // İzleyicilere de yeniden başlatma mesajını gönder
   if (gameState.viewerCount > 0) {

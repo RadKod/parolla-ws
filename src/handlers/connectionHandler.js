@@ -140,7 +140,7 @@ function handleViewerDisconnect(ws) {
     broadcast(gameState.wss, {
       type: MessageType.VIEWER_COUNT_UPDATE,
       viewerCount: gameState.viewerCount
-    });
+    }, [], false);
   } catch (error) {
     console.error('Viewer disconnect handling error:', error);
   }
@@ -207,7 +207,7 @@ async function handleConnection(wss, ws, req) {
       broadcast(gameState.wss, {
         type: MessageType.VIEWER_COUNT_UPDATE,
         viewerCount: gameState.viewerCount
-      });
+      }, [], false);
 
       // İzleyiciye hoş geldin mesajı gönder
       sendToPlayer(ws, {
@@ -407,14 +407,14 @@ async function handleConnection(wss, ws, req) {
         totalQuestions: gameState.questions.length,
         viewerCount: gameState.viewerCount || 0
       }
-    }, [player.id]); // Yeni katılan oyuncuya gönderme
+    }, [player.id], false); // Yeni katılan oyuncuya gönderme
 
     // Sistem mesajını gönder
     broadcast(gameState.wss, {
       type: MessageType.SYSTEM_MESSAGE,
       message: `${player.name} oyuna katıldı`,
       messageType: 'player_joined'
-    }, [player.id]);
+    }, [player.id], false);
 
     // Oyuncuya bilgilerini gönder
     sendToPlayer(ws, {

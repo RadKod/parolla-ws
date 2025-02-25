@@ -5,8 +5,9 @@ const WebSocket = require('ws');
  * @param {WebSocket.Server} wss WebSocket sunucusu
  * @param {Object} message Gönderilecek mesaj
  * @param {Array<string>} [excludePlayerIds] Mesajı almayacak oyuncuların ID'leri
+ * @param {boolean} [includeViewers=false] İzleyicilere de mesaj gönderilip gönderilmeyeceği
  */
-function broadcast(wss, message, excludePlayerIds = []) {
+function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) {
   if (!wss || !wss.clients) {
     console.error('Invalid WebSocket server or no clients');
     return;
@@ -22,9 +23,11 @@ function broadcast(wss, message, excludePlayerIds = []) {
           continue;
         }
 
-        // İzleyici kontrolü - izleyiciler her mesajı alabilir
+        // İzleyici kontrolü - sadece includeViewers true ise izleyicilere gönder
         if (client._isViewer) {
-          client.send(jsonMessage);
+          if (includeViewers) {
+            client.send(jsonMessage);
+          }
           continue;
         }
 
