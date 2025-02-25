@@ -22,7 +22,6 @@ services:
       - ./ssl:/app/ssl
     networks:
       - parolla-network
-    network_mode: "host"  # port mapping yerine
 
 networks:
   parolla-network:
