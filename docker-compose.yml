@@ -13,7 +13,7 @@ services:
       - HOST=0.0.0.0
       - API_URL=${API_URL}
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=https://parolla.app,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://parolla-ws.radkod.com
+      - CORS_ORIGIN=https://parolla.app,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://parolla-ws.radkod.com,https://parolla-ws.radkod.com:1881,http://parolla-ws.radkod.com,http://parolla-ws.radkod.com:1881
     volumes:
       - ./logs:/app/logs
     networks:
