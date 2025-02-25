@@ -27,53 +27,36 @@ function cleanToken(token) {
   return token.trim();
 }
 
-// SSL sertifikası ve anahtar dosyalarının yolları
-const SSL_ENABLED = process.env.SSL_ENABLED === 'true';
-const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
-const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
+try {
+  // SSL sertifikalarını yükle
+  const options = {
+    key: fs.readFileSync(process.env.SSL_KEY_PATH || '/app/ssl/privkey.pem'),
+    cert: fs.readFileSync(process.env.SSL_CERT_PATH || '/app/ssl/fullchain.pem'),
+    // Modern TLS sürümlerini zorunlu kıl
+    minVersion: 'TLSv1.2',
+    // Bu satırı kaldırın veya false yapın - güvenlik sorunu yaratıyor
+    // rejectUnauthorized: false
+  };
 
-let server;
-let wss;
-
-// SSL etkinse HTTPS sunucusu oluştur, değilse HTTP sunucusu oluştur
-if (SSL_ENABLED && SSL_KEY_PATH && SSL_CERT_PATH) {
-  try {
-    const sslOptions = {
-      key: fs.readFileSync(SSL_KEY_PATH),
-      cert: fs.readFileSync(SSL_CERT_PATH),
-      minVersion: 'TLSv1.2'
-    };
-    server = https.createServer(sslOptions);
-    console.log('HTTPS server created with SSL');
+  // HTTPS sunucusu oluştur
+  const server = https.createServer(options, (req, res) => {
+    // CORS başlıklarını ayarla
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
-    // WebSocket sunucusunu HTTPS sunucusuna bağla
-    wss = new WebSocket.Server({ 
-      server: server,
-      clientTracking: true,
-      perMessageDeflate: false
-    });
-  } catch (error) {
-    console.error('SSL dosyaları yüklenirken hata oluştu:', error.message);
-    console.log('HTTP sunucusu oluşturuluyor...');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     
-    // WebSocket sunucusunu doğrudan port üzerinden oluştur
-    wss = new WebSocket.Server({ 
-      port: PORT,
-      host: HOST,
-      clientTracking: true,
-      perMessageDeflate: false
-    });
-  }
-} else {
-  // WebSocket sunucusunu doğrudan port üzerinden oluştur
-  wss = new WebSocket.Server({ 
-    port: PORT,
-    host: HOST,
-    clientTracking: true,
-    perMessageDeflate: false
+    res.writeHead(200);
+    res.end('WebSocket sunucusu çalışıyor!');
   });
-  console.log('WebSocket server created without SSL');
-}
+
+  // WebSocket sunucusunu HTTPS sunucusuna bağla
+  const wss = new WebSocket.Server({ server });
 
 // gameState'e WebSocket sunucusunu ekle
 gameState.wss = wss;
@@ -118,27 +101,26 @@ wss.on('error', (error) => {
   console.error('WebSocket server error:', error);
 });
 
-// Sunucuyu başlat ve oyunu başlat
-if (server) {
-  // HTTPS sunucusu varsa onu başlat
+  // Sunucuyu başlat
+  const PORT = process.env.PORT || 1881;
+  const HOST = process.env.HOST || '0.0.0.0';
   server.listen(PORT, HOST, () => {
-    console.log(`WebSocket server running at wss://${HOST}:${PORT}`);
+    console.log(`Güvenli WebSocket sunucusu çalışıyor: wss://${HOST}:${PORT}`);
+    console.log(`İzin verilen originler: ${process.env.CORS_ORIGIN || '*'}`);
     
-    // Oyunu başlat
+    // Oyunu başlat - bunun çalıştığından emin olalım
     initializeGame().catch(error => {
       console.error('Oyun başlatma hatası:', error.message);
     });
   });
-} else {
-  // Doğrudan WebSocket sunucusu başlatıldıysa
-  wss.on('listening', () => {
-    console.log(`WebSocket server running at ws://${HOST}:${PORT}`);
-    
-    // Oyunu başlat
-    initializeGame().catch(error => {
-      console.error('Oyun başlatma hatası:', error.message);
-    });
+  
+  // Hata yakalama
+  server.on('error', (error) => {
+    console.error(`Sunucu hatası: ${error.message}`);
   });
+  
+} catch (error) {
+  console.error('Sunucu başlatılırken hata oluştu:', error);
 }
 
 // Yakalanmamış hataları yakala

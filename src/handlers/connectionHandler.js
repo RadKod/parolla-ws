@@ -317,84 +317,8 @@ async function handleConnection(wss, ws, req) {
       messageType: 'welcome'
     });
 
-    // İlk oyuncu bağlandığında oyunu başlat
-    if (gameState.players.size === 1) {
-      // Oyun durumu sıfırlanmışsa yeni soruya geç
-      if (!gameState.currentQuestion || !gameState.lastQuestionTime) {
-        // Kısa bir gecikme ile yeni soru gönder (oyuncunun bağlantısının tam oturması için)
-        setTimeout(() => {
-          if (gameState.players.size > 0) {
-            sendNewQuestion();
-          }
-        }, 1000);
-      } else {
-        const timeInfo = getRemainingTime(gameState.lastQuestionTime);
-        
-        // Mevcut soruyu gönder
-        sendToPlayer(ws, {
-          type: MessageType.QUESTION,
-          question: {
-            id: gameState.currentQuestion.id,
-            question: gameState.currentQuestion.question,
-            letter: gameState.currentQuestion.letter
-          },
-          gameStatus: {
-            roundTime: gameState.ROUND_TIME,
-            questionNumber: gameState.questionIndex + 1,
-            totalQuestions: gameState.questions.length,
-            timestamp: gameState.lastQuestionTime,
-            remaining: timeInfo.remaining
-          }
-        });
-
-        // Eğer bekleme süresindeyse ve soru süresi bitmişse, bekleme süresini gönder
-        if (gameState.waitingStartTime && timeInfo.remaining <= 0) {
-          const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-          
-          // Eğer bekleme süresi de bitmişse yeni soruya geç
-          if (waitingTimeInfo.remaining <= 0) {
-            // Kısa bir gecikme ile yeni soru gönder
-            setTimeout(() => {
-              if (gameState.players.size > 0) {
-                sendNewQuestion();
-              }
-            }, 1000);
-          } else {
-            sendToPlayer(ws, {
-              type: MessageType.WAITING_NEXT,
-              time: waitingTimeInfo
-            });
-          }
-        }
-        // Değilse ve süre devam ediyorsa, süre güncellemesini başlat
-        else if (timeInfo.remaining > 0) {
-          // Süre güncellemesini hemen gönder
-          sendToPlayer(ws, {
-            type: MessageType.TIME_UPDATE,
-            time: timeInfo
-          });
-          
-          // Eğer interval yoksa başlat
-          if (!gameState.timeUpdateInterval) {
-            startTimeUpdateInterval();
-          }
-        } else {
-          // Süre bitmişse yeni soruya geç
-          sendNewQuestion();
-        }
-      }
-    } 
-    // Mevcut soru varsa yeni bağlanan oyuncuya gönder
-    else if (gameState.currentQuestion) {
-      const timeInfo = getRemainingTime(gameState.lastQuestionTime);
-      
-      // Eğer süre bitmişse ve bekleme süresinde değilse yeni soruya geç
-      if (timeInfo.remaining <= 0 && !gameState.waitingStartTime) {
-        sendNewQuestion();
-        return;
-      }
-
-      // Mevcut soruyu gönder
+    // Eğer mevcut bir soru varsa, yeni oyuncuya gönder
+    if (gameState.currentQuestion) {
       sendToPlayer(ws, {
         type: MessageType.QUESTION,
         question: {
@@ -406,38 +330,31 @@ async function handleConnection(wss, ws, req) {
           roundTime: gameState.ROUND_TIME,
           questionNumber: gameState.questionIndex + 1,
           totalQuestions: gameState.questions.length,
-          timestamp: gameState.lastQuestionTime,
-          remaining: timeInfo.remaining
+          timestamp: gameState.lastQuestionTime
         }
       });
 
-      // Eğer bekleme süresindeyse ve soru süresi bitmişse, bekleme süresini gönder
-      if (gameState.waitingStartTime && timeInfo.remaining <= 0) {
-        const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-        
-        // Eğer bekleme süresi de bitmişse yeni soruya geç
-        if (waitingTimeInfo.remaining <= 0) {
-          sendNewQuestion();
-        } else {
-          sendToPlayer(ws, {
-            type: MessageType.WAITING_NEXT,
-            time: waitingTimeInfo
-          });
-        }
-      }
-      // Değilse ve süre devam ediyorsa, süre güncellemesini başlat
-      else if (timeInfo.remaining > 0) {
-        // Süre güncellemesini hemen gönder
+      // Kalan süreyi hesapla ve gönder
+      const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+      if (timeInfo.remaining > 0) {
         sendToPlayer(ws, {
           type: MessageType.TIME_UPDATE,
           time: timeInfo
         });
-        
-        // Eğer interval yoksa başlat
-        if (!gameState.timeUpdateInterval) {
-          startTimeUpdateInterval();
-        }
       }
+      // Eğer bekleme süresindeyse
+      else if (gameState.waitingStartTime) {
+        const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+        sendToPlayer(ws, {
+          type: MessageType.WAITING_NEXT,
+          time: waitingTimeInfo
+        });
+      }
+    }
+    // Eğer mevcut soru yoksa ve oyuncular varsa, yeni soru gönder
+    else if (gameState.players.size > 0) {
+      // Yeni soru gönder
+      sendNewQuestion();
     }
   } catch (error) {
     console.error('Connection handling error:', error);
