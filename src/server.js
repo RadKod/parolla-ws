@@ -29,10 +29,12 @@ function cleanToken(token) {
 try {
   // SSL sertifikalarını yükle
   const options = {
-    key: fs.readFileSync('/app/ssl/privkey.pem'),
-    cert: fs.readFileSync('/app/ssl/fullchain.pem'),
-    // IP adresi için gerekli
-    rejectUnauthorized: false
+    key: fs.readFileSync(process.env.SSL_KEY_PATH || '/app/ssl/privkey.pem'),
+    cert: fs.readFileSync(process.env.SSL_CERT_PATH || '/app/ssl/fullchain.pem'),
+    // Modern TLS sürümlerini zorunlu kıl
+    minVersion: 'TLSv1.2',
+    // Bu satırı kaldırın veya false yapın - güvenlik sorunu yaratıyor
+    // rejectUnauthorized: false
   };
 
   // HTTPS sunucusu oluştur

@@ -15,7 +15,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGIN=https://parolla.app,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://parolla-ws.radkod.com,https://parolla-ws.radkod.com:1881,wss://parolla-ws.radkod.com:1881
       - SSL_KEY_PATH=/app/ssl/privkey.pem
-      - SSL_CERT_PATH=/app/ssl/cert.pem
+      - SSL_CERT_PATH=/app/ssl/fullchain.pem
     volumes:
       - ./logs:/app/logs
       - ./ssl:/app/ssl
