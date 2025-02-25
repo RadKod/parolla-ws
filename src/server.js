@@ -7,6 +7,8 @@ const { initializeGame } = require('./handlers/gameHandler');
 const { getUserFromAPI } = require('./services/authService');
 const gameState = require('./state/gameState');
 const url = require('url');
+const https = require('https');
+const fs = require('fs');
 
 /**
  * Token'ı temizler (Bearer prefix'ini kaldırır)
@@ -24,21 +26,27 @@ function cleanToken(token) {
   return token.trim();
 }
 
-// WebSocket sunucusunu oluştur
-const server = new WebSocket.Server({
-  port: process.env.PORT || 1881,
-  host: process.env.HOST || '0.0.0.0'
-});
+// SSL sertifikalarını yükle
+const options = {
+  key: fs.readFileSync('/app/ssl/privkey.pem'),
+  cert: fs.readFileSync('/app/ssl/fullchain.pem')
+};
+
+// HTTPS sunucusu oluştur
+const server = https.createServer(options);
+
+// WebSocket sunucusunu HTTPS sunucusuna bağla
+const wss = new WebSocket.Server({ server });
 
 // gameState'e WebSocket sunucusunu ekle
-gameState.wss = server;
+gameState.wss = wss;
 
 // WebSocket bağlantılarını dinle
-server.on('connection', async (ws, req) => {
+wss.on('connection', async (ws, req) => {
   console.log('New WebSocket connection');
   
   try {
-    await handleConnection(server, ws, req);
+    await handleConnection(wss, ws, req);
 
     // Mesajları dinle
     ws.on('message', async (message) => {
@@ -69,13 +77,13 @@ server.on('connection', async (ws, req) => {
 });
 
 // WebSocket sunucusu hata yönetimi
-server.on('error', (error) => {
+wss.on('error', (error) => {
   console.error('WebSocket server error:', error);
 });
 
-// Sunucuyu başlat ve oyunu başlat
-server.on('listening', () => {
-  console.log(`WebSocket server running at ws://${HOST}:${PORT}`);
+// Sunucuyu başlat
+server.listen(PORT, HOST, () => {
+  console.log(`Secure WebSocket server running at wss://${HOST}:${PORT}`);
   
   // Oyunu başlat
   initializeGame().catch(error => {
