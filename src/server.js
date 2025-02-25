@@ -25,22 +25,20 @@ function cleanToken(token) {
 }
 
 // WebSocket sunucusunu oluştur
-const wss = new WebSocket.Server({ 
-  port: PORT,
-  host: HOST,
-  clientTracking: true,
-  perMessageDeflate: false
+const server = new WebSocket.Server({
+  port: process.env.PORT || 1881,
+  host: process.env.HOST || '0.0.0.0'
 });
 
 // gameState'e WebSocket sunucusunu ekle
-gameState.wss = wss;
+gameState.wss = server;
 
 // WebSocket bağlantılarını dinle
-wss.on('connection', async (ws, req) => {
+server.on('connection', async (ws, req) => {
   console.log('New WebSocket connection');
   
   try {
-    await handleConnection(wss, ws, req);
+    await handleConnection(server, ws, req);
 
     // Mesajları dinle
     ws.on('message', async (message) => {
@@ -71,12 +69,12 @@ wss.on('connection', async (ws, req) => {
 });
 
 // WebSocket sunucusu hata yönetimi
-wss.on('error', (error) => {
+server.on('error', (error) => {
   console.error('WebSocket server error:', error);
 });
 
 // Sunucuyu başlat ve oyunu başlat
-wss.on('listening', () => {
+server.on('listening', () => {
   console.log(`WebSocket server running at ws://${HOST}:${PORT}`);
   
   // Oyunu başlat
