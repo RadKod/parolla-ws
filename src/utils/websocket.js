@@ -22,6 +22,12 @@ function broadcast(wss, message, excludePlayerIds = []) {
           continue;
         }
 
+        // İzleyici kontrolü - izleyiciler her mesajı alabilir
+        if (client._isViewer) {
+          client.send(jsonMessage);
+          continue;
+        }
+
         // Player ID kontrolü
         const playerId = client._playerId;
         if (!playerId || excludePlayerIds.includes(playerId)) {
@@ -72,7 +78,47 @@ function sendToPlayer(ws, message) {
   }
 }
 
+/**
+ * Sadece izleyicilere mesaj gönderir
+ * @param {WebSocket.Server} wss WebSocket sunucusu
+ * @param {Object} message Gönderilecek mesaj
+ */
+function broadcastToViewers(wss, message) {
+  if (!wss || !wss.clients) {
+    console.error('Invalid WebSocket server or no clients');
+    return;
+  }
+
+  try {
+    const jsonMessage = JSON.stringify(message);
+    const clients = Array.from(wss.clients);
+    
+    for (const client of clients) {
+      try {
+        if (client.readyState !== WebSocket.OPEN) {
+          continue;
+        }
+
+        // Sadece izleyicilere gönder
+        if (client._isViewer) {
+          client.send(jsonMessage);
+        }
+      } catch (error) {
+        console.error('Error sending to viewer:', error);
+        try {
+          client.terminate();
+        } catch (e) {
+          console.error('Client termination error:', e);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Broadcast to viewers error:', error);
+  }
+}
+
 module.exports = {
   broadcast,
-  sendToPlayer
+  sendToPlayer,
+  broadcastToViewers
 }; 

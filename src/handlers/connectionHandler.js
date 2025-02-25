@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const MessageType = require('../constants/messageTypes');
 const Player = require('../models/Player');
 const { getUserFromAPI } = require('../services/authService');
-const { broadcast, sendToPlayer } = require('../utils/websocket');
+const { broadcast, sendToPlayer, broadcastToViewers } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const gameState = require('../state/gameState');
 const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
@@ -119,6 +119,34 @@ function handleDisconnect(playerId) {
 }
 
 /**
+ * İzleyici bağlantısı kapandığında yapılacak işlemler
+ * @param {WebSocket} ws WebSocket bağlantısı
+ */
+function handleViewerDisconnect(ws) {
+  try {
+    // WebSocket bağlantısını kapat
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.terminate(); // force close
+    }
+
+    // İzleyici sayısını azalt
+    if (gameState.viewerCount > 0) {
+      gameState.viewerCount--;
+    }
+
+    console.log(`İzleyici ayrıldı. Toplam izleyici sayısı: ${gameState.viewerCount}`);
+    
+    // İzleyici sayısı değiştiğinde oyunculara bildir
+    broadcast(gameState.wss, {
+      type: MessageType.VIEWER_COUNT_UPDATE,
+      viewerCount: gameState.viewerCount
+    });
+  } catch (error) {
+    console.error('Viewer disconnect handling error:', error);
+  }
+}
+
+/**
  * Yeni bir WebSocket bağlantısını yönetir
  * @param {WebSocket.Server} wss WebSocket sunucusu
  * @param {WebSocket} ws WebSocket bağlantısı
@@ -135,12 +163,119 @@ async function handleConnection(wss, ws, req) {
     const { query } = url.parse(req.url, true);
     const token = cleanToken(query.token);
 
-    if (!token) {
-      sendToPlayer(ws, {
-        type: MessageType.ERROR,
-        message: 'Authentication required'
+    // Token yoksa veya "undefined" ise izleyici modunda bağlan
+    if (!token || token === "undefined") {
+      console.log('İzleyici bağlantısı: Token yok veya geçersiz');
+      
+      // İzleyici sayısını artır
+      gameState.viewerCount = (gameState.viewerCount || 0) + 1;
+      
+      // İzleyici olduğunu belirt
+      ws._isViewer = true;
+      
+      // Ping/Pong mekanizması kur
+      isAlive = true;
+      pingInterval = setInterval(() => {
+        if (!isAlive) {
+          clearInterval(pingInterval);
+          return ws.terminate();
+        }
+        isAlive = false;
+        ws.ping();
+      }, 30000);
+
+      ws.on('pong', () => {
+        isAlive = true;
       });
-      ws.terminate();
+
+      // Bağlantı hatalarını dinle
+      ws.on('error', (error) => {
+        console.error('İzleyici bağlantı hatası:', error);
+        clearInterval(pingInterval);
+        handleViewerDisconnect(ws);
+      });
+
+      // Bağlantı kapandığında
+      ws.on('close', () => {
+        clearInterval(pingInterval);
+        handleViewerDisconnect(ws);
+      });
+
+      console.log(`İzleyici bağlandı. Toplam izleyici sayısı: ${gameState.viewerCount}`);
+      
+      // İzleyici sayısı değiştiğinde oyunculara bildir
+      broadcast(gameState.wss, {
+        type: MessageType.VIEWER_COUNT_UPDATE,
+        viewerCount: gameState.viewerCount
+      });
+
+      // İzleyiciye hoş geldin mesajı gönder
+      sendToPlayer(ws, {
+        type: MessageType.CONNECTED,
+        isViewer: true,
+        message: 'İzleyici modunda bağlandınız. Sadece soruları görebilirsiniz, cevap veremezsiniz.',
+        playerList: Array.from(gameState.players.values()).map(p => ({
+          id: p.id,
+          name: p.name,
+          fingerprint: p.fingerprint,
+          is_permanent: p.is_permanent,
+          lives: p.lives,
+          score: p.score,
+          lastConnectionTime: p.lastConnectionTime,
+          isOnline: p.ws.readyState === WebSocket.OPEN
+        })),
+        gameInfo: {
+          roundTime: gameState.ROUND_TIME,
+          maxLives: gameState.MAX_LIVES,
+          totalQuestions: gameState.questions.length,
+          viewerCount: gameState.viewerCount
+        }
+      });
+
+      // Eğer mevcut bir soru varsa, izleyiciye gönder
+      if (gameState.currentQuestion) {
+        console.log('İzleyiciye mevcut soru gönderiliyor:', gameState.currentQuestion.id);
+        
+        sendToPlayer(ws, {
+          type: MessageType.QUESTION,
+          question: {
+            id: gameState.currentQuestion.id,
+            question: gameState.currentQuestion.question,
+            letter: gameState.currentQuestion.letter
+          },
+          gameStatus: {
+            roundTime: gameState.ROUND_TIME,
+            questionNumber: gameState.questionIndex + 1,
+            totalQuestions: gameState.questions.length,
+            timestamp: gameState.lastQuestionTime,
+            viewerCount: gameState.viewerCount
+          }
+        });
+
+        // Kalan süreyi hesapla ve gönder
+        const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+        if (timeInfo.remaining > 0) {
+          console.log('İzleyiciye kalan süre gönderiliyor:', timeInfo.remaining);
+          
+          sendToPlayer(ws, {
+            type: MessageType.TIME_UPDATE,
+            time: timeInfo
+          });
+        }
+        // Eğer bekleme süresindeyse
+        else if (gameState.waitingStartTime) {
+          console.log('İzleyiciye bekleme süresi gönderiliyor');
+          
+          const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+          sendToPlayer(ws, {
+            type: MessageType.WAITING_NEXT,
+            time: waitingTimeInfo
+          });
+        }
+      } else {
+        console.log('Mevcut soru yok, izleyici beklemede');
+      }
+      
       return;
     }
 
@@ -269,7 +404,8 @@ async function handleConnection(wss, ws, req) {
       gameInfo: {
         roundTime: gameState.ROUND_TIME,
         maxLives: gameState.MAX_LIVES,
-        totalQuestions: gameState.questions.length
+        totalQuestions: gameState.questions.length,
+        viewerCount: gameState.viewerCount || 0
       }
     }, [player.id]); // Yeni katılan oyuncuya gönderme
 
@@ -306,7 +442,8 @@ async function handleConnection(wss, ws, req) {
       gameInfo: {
         roundTime: gameState.ROUND_TIME,
         maxLives: gameState.MAX_LIVES,
-        totalQuestions: gameState.questions.length
+        totalQuestions: gameState.questions.length,
+        viewerCount: gameState.viewerCount || 0
       }
     });
 

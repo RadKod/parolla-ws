@@ -1,5 +1,5 @@
 const MessageType = require('../constants/messageTypes');
-const { broadcast, sendToPlayer } = require('../utils/websocket');
+const { broadcast, sendToPlayer, broadcastToViewers } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const { MAX_LIVES, CORRECT_ANSWER_SCORE, NEXT_QUESTION_DELAY } = require('../config/game.config');
 const { getUnlimitedQuestions } = require('../services/questionService');
@@ -68,8 +68,8 @@ function sendNewQuestion() {
     player.lives = MAX_LIVES;
   }
 
-  // Tüm oyunculara soruyu gönder
-  broadcast(gameState.wss, {
+  // Soru mesajını oluştur
+  const questionMessage = {
     type: MessageType.QUESTION,
     question: {
       id: gameState.currentQuestion.id,
@@ -80,9 +80,21 @@ function sendNewQuestion() {
       roundTime: gameState.ROUND_TIME,
       questionNumber: gameState.questionIndex + 1,
       totalQuestions: gameState.questions.length,
-      timestamp: gameState.lastQuestionTime
+      timestamp: gameState.lastQuestionTime,
+      viewerCount: gameState.viewerCount || 0
     }
-  });
+  };
+
+  console.log(`Yeni soru gönderiliyor (ID: ${gameState.currentQuestion.id}), İzleyici sayısı: ${gameState.viewerCount || 0}`);
+
+  // Tüm oyunculara soruyu gönder
+  broadcast(gameState.wss, questionMessage);
+
+  // İzleyicilere de soruyu gönder
+  if (gameState.viewerCount > 0) {
+    console.log(`${gameState.viewerCount} izleyiciye soru gönderiliyor`);
+    broadcastToViewers(gameState.wss, questionMessage);
+  }
 
   // Süre güncellemesi için interval başlat
   startTimeUpdateInterval();
@@ -126,11 +138,21 @@ function startTimeUpdateInterval() {
     return;
   }
 
-  // İlk süre güncellemesini hemen gönder
-  broadcast(gameState.wss, {
+  // Süre güncelleme mesajını oluştur
+  const timeUpdateMessage = {
     type: MessageType.TIME_UPDATE,
     time: initialTimeInfo
-  });
+  };
+
+  // İlk süre güncellemesini hemen gönder
+  broadcast(gameState.wss, timeUpdateMessage);
+  
+  // İzleyicilere de süre güncellemesini gönder
+  if (gameState.viewerCount > 0) {
+    console.log(`${gameState.viewerCount} izleyiciye süre güncellemesi gönderiliyor`);
+    broadcastToViewers(gameState.wss, timeUpdateMessage);
+  }
+
   console.log('Time Update Started:', {
     initialRemaining: initialTimeInfo.remaining,
     timestamp: new Date().toISOString()
@@ -168,10 +190,18 @@ function startTimeUpdateInterval() {
     
     // Süre devam ediyorsa güncelleme gönder
     if (timeInfo.remaining > 0) {
-      broadcast(gameState.wss, {
+      const timeUpdateMsg = {
         type: MessageType.TIME_UPDATE,
         time: timeInfo
-      });
+      };
+      
+      broadcast(gameState.wss, timeUpdateMsg);
+      
+      // İzleyicilere de süre güncellemesini gönder
+      if (gameState.viewerCount > 0) {
+        broadcastToViewers(gameState.wss, timeUpdateMsg);
+      }
+      
       lastUpdateTime = now;
     } 
     // Süre bittiyse
@@ -228,22 +258,44 @@ function handleTimeUp() {
     gameState.roundTimer = null;
   }
 
-  // Tüm oyunculara doğru cevabı gönder
-  broadcast(gameState.wss, {
+  // Doğru cevap mesajını oluştur
+  const timeUpMessage = {
     type: MessageType.TIME_UP,
     correctAnswer: gameState.currentQuestion.answer
-  });
+  };
+
+  console.log(`Süre doldu, doğru cevap: ${gameState.currentQuestion.answer}`);
+
+  // Tüm oyunculara doğru cevabı gönder
+  broadcast(gameState.wss, timeUpMessage);
+  
+  // İzleyicilere de doğru cevabı gönder
+  if (gameState.viewerCount > 0) {
+    console.log(`${gameState.viewerCount} izleyiciye doğru cevap gönderiliyor`);
+    broadcastToViewers(gameState.wss, timeUpMessage);
+  }
 
   // Bekleme süresini başlat
   gameState.waitingStartTime = Date.now();
   gameState.questionIndex++;
 
-  // İlk waiting_next güncellemesini hemen gönder
+  // Bekleme süresi mesajını oluştur
   const initialWaitingTime = getRemainingWaitingTime(gameState.waitingStartTime);
-  broadcast(gameState.wss, {
+  const waitingMessage = {
     type: MessageType.WAITING_NEXT,
     time: initialWaitingTime
-  });
+  };
+
+  console.log(`Bekleme süresi başladı: ${NEXT_QUESTION_DELAY}ms`);
+
+  // İlk waiting_next güncellemesini hemen gönder
+  broadcast(gameState.wss, waitingMessage);
+  
+  // İzleyicilere de bekleme mesajını gönder
+  if (gameState.viewerCount > 0) {
+    console.log(`${gameState.viewerCount} izleyiciye bekleme mesajı gönderiliyor`);
+    broadcastToViewers(gameState.wss, waitingMessage);
+  }
 
   // Bekleme süresi için interval başlat
   let waitingInterval = setInterval(() => {
@@ -251,10 +303,17 @@ function handleTimeUp() {
     
     // Süre bitmemişse güncelleme gönder
     if (timeInfo.remaining > 0) {
-      broadcast(gameState.wss, {
+      const waitingUpdateMsg = {
         type: MessageType.WAITING_NEXT,
         time: timeInfo
-      });
+      };
+      
+      broadcast(gameState.wss, waitingUpdateMsg);
+      
+      // İzleyicilere de bekleme güncellemesini gönder
+      if (gameState.viewerCount > 0) {
+        broadcastToViewers(gameState.wss, waitingUpdateMsg);
+      }
     } 
     // Süre tam bittiyse yeni soruya geç
     else if (timeInfo.remaining === 0) {
@@ -376,9 +435,19 @@ function handleAnswer(player, answer) {
  * Oyunu yeniden başlatır
  */
 async function handleGameRestart() {
-  broadcast(gameState.wss, {
+  const restartMessage = {
     type: MessageType.GAME_RESTART
-  });
+  };
+  
+  console.log('Oyun yeniden başlatılıyor...');
+  
+  broadcast(gameState.wss, restartMessage);
+  
+  // İzleyicilere de yeniden başlatma mesajını gönder
+  if (gameState.viewerCount > 0) {
+    console.log(`${gameState.viewerCount} izleyiciye yeniden başlatma mesajı gönderiliyor`);
+    broadcastToViewers(gameState.wss, restartMessage);
+  }
 
   // Oyun durumunu sıfırla
   gameState.questionIndex = 0;

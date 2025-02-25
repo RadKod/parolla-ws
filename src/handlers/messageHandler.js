@@ -10,6 +10,15 @@ const { handleAnswer } = require('./gameHandler');
  * @param {string} playerId Oyuncu ID'si
  */
 function handleMessage(ws, message, playerId) {
+  // İzleyici modundaki kullanıcılar mesaj gönderemez
+  if (ws._isViewer) {
+    sendToPlayer(ws, {
+      type: MessageType.ERROR,
+      message: 'İzleyici modunda mesaj gönderemezsiniz'
+    });
+    return;
+  }
+
   let data;
   try {
     data = JSON.parse(message);

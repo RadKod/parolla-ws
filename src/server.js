@@ -10,6 +10,8 @@ const { initializeGame } = require('./handlers/gameHandler');
 const { getUserFromAPI } = require('./services/authService');
 const gameState = require('./state/gameState');
 const url = require('url');
+const MessageType = require('./constants/messageTypes');
+const { sendToPlayer } = require('./utils/websocket');
 
 /**
  * Token'ı temizler (Bearer prefix'ini kaldırır)
@@ -71,15 +73,24 @@ wss.on('connection', async (ws, req) => {
     // Mesajları dinle
     ws.on('message', async (message) => {
       try {
-        // URL'den token parametresini al ve temizle
-        const { query } = url.parse(req.url, true);
-        const token = cleanToken(query.token);
-        if (!token) return;
+        // İzleyici modundaki kullanıcılar için mesaj işleme
+        if (ws._isViewer) {
+          console.log('İzleyici mesaj göndermeye çalıştı, işlenmedi');
+          sendToPlayer(ws, {
+            type: MessageType.ERROR,
+            message: 'İzleyici modunda mesaj gönderemezsiniz'
+          });
+          return;
+        }
+        
+        // Oyuncu ID'sini WebSocket nesnesinden al
+        const playerId = ws._playerId;
+        if (!playerId) {
+          console.error('Player ID bulunamadı');
+          return;
+        }
 
-        const userData = await getUserFromAPI(token);
-        if (!userData) return;
-
-        handleMessage(ws, message.toString(), userData.id);
+        handleMessage(ws, message.toString(), playerId);
       } catch (error) {
         console.error('Message handling error:', error);
       }

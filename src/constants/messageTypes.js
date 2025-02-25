@@ -43,5 +43,8 @@ module.exports = {
   PLAYER_LIST_UPDATE: 'player_list_update',
 
   /** Sistem mesajlarını bildirir */
-  SYSTEM_MESSAGE: 'system_message'
+  SYSTEM_MESSAGE: 'system_message',
+  
+  /** İzleyici sayısı güncellemesini bildirir */
+  VIEWER_COUNT_UPDATE: 'viewer_count_update'
 }; 

@@ -42,6 +42,9 @@ const gameState = {
   // Oyuncular Map'i (playerId -> Player)
   players: new Map(),
 
+  // İzleyici sayısı
+  viewerCount: 0,
+
   // Round bazlı can durumları (roundIndex_playerId -> lives)
   roundLives: new Map(),
 
