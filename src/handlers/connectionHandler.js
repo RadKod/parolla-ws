@@ -135,7 +135,10 @@ async function handleConnection(wss, ws, req) {
     const { query } = url.parse(req.url, true);
     const token = cleanToken(query.token);
 
+    console.log('Bağlantı isteği alındı, token:', token ? 'Mevcut' : 'Yok');
+
     if (!token) {
+      console.log('Token eksik, bağlantı kapatılıyor');
       sendToPlayer(ws, {
         type: MessageType.ERROR,
         message: 'Authentication required'
@@ -145,8 +148,11 @@ async function handleConnection(wss, ws, req) {
     }
 
     // Kullanıcı bilgilerini API'den al
+    console.log('Kullanıcı bilgileri alınıyor...');
     const userData = await getUserFromAPI(token);
+    
     if (!userData) {
+      console.log('Kullanıcı bilgileri alınamadı, bağlantı kapatılıyor');
       sendToPlayer(ws, {
         type: MessageType.ERROR,
         message: 'Invalid token or user not found'
@@ -155,6 +161,7 @@ async function handleConnection(wss, ws, req) {
       return;
     }
 
+    console.log('Kullanıcı doğrulandı:', userData.id);
     playerId = userData.id;
 
     // WebSocket nesnesine player ID'yi ekle
@@ -163,6 +170,7 @@ async function handleConnection(wss, ws, req) {
     // Eğer aynı kullanıcının önceki bağlantısı varsa kapat
     const existingPlayer = gameState.players.get(userData.id);
     if (existingPlayer) {
+      console.log('Kullanıcının önceki bağlantısı kapatılıyor:', userData.id);
       // Önceki bağlantıyı kapat
       if (existingPlayer.ws && existingPlayer.ws.readyState === WebSocket.OPEN) {
         existingPlayer.ws.terminate(); // force close
@@ -190,9 +198,12 @@ async function handleConnection(wss, ws, req) {
       // Önceki durumu geri yükle
       player.lives = previousState.lives;
       player.score = previousState.score;
+      
+      console.log('Kullanıcı yeniden bağlandı, önceki durum yüklendi:', userData.id);
     } else {
       // Yeni oyuncuyu oluştur
       player = new Player(ws, userData);
+      console.log('Yeni oyuncu oluşturuldu:', userData.id);
 
       // Eğer mevcut round'da can durumu varsa onu kullan
       if (gameState.currentQuestion) {
@@ -200,6 +211,7 @@ async function handleConnection(wss, ws, req) {
         const roundLives = gameState.roundLives.get(roundKey);
         if (roundLives !== undefined) {
           player.lives = roundLives;
+          console.log('Mevcut round can durumu yüklendi:', roundLives);
         }
       }
     }
@@ -310,6 +322,8 @@ async function handleConnection(wss, ws, req) {
       }
     });
 
+    console.log('Oyuncuya bağlantı bilgileri gönderildi:', userData.id);
+
     // Hoş geldin mesajını gönder
     sendToPlayer(ws, {
       type: MessageType.SYSTEM_MESSAGE,
@@ -319,6 +333,7 @@ async function handleConnection(wss, ws, req) {
 
     // Eğer mevcut bir soru varsa, yeni oyuncuya gönder
     if (gameState.currentQuestion) {
+      console.log('Mevcut soru yeni oyuncuya gönderiliyor:', userData.id);
       sendToPlayer(ws, {
         type: MessageType.QUESTION,
         question: {
@@ -353,6 +368,7 @@ async function handleConnection(wss, ws, req) {
     }
     // Eğer mevcut soru yoksa ve oyuncular varsa, yeni soru gönder
     else if (gameState.players.size > 0) {
+      console.log('Yeni soru gönderiliyor...');
       // Yeni soru gönder
       sendNewQuestion();
     }

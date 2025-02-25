@@ -74,15 +74,15 @@ wss.on('connection', async (ws, req) => {
     // Mesajları dinle
     ws.on('message', async (message) => {
       try {
-        // URL'den token parametresini al ve temizle
-        const { query } = url.parse(req.url, true);
-        const token = cleanToken(query.token);
-        if (!token) return;
-
-        const userData = await getUserFromAPI(token);
-        if (!userData) return;
-
-        handleMessage(ws, message.toString(), userData.id);
+        // Oyuncu ID'sini WebSocket nesnesinden al
+        const playerId = ws._playerId;
+        if (!playerId) {
+          console.error('Mesaj işleme hatası: Oyuncu ID bulunamadı');
+          return;
+        }
+        
+        // Mesajı işle
+        handleMessage(ws, message.toString(), playerId);
       } catch (error) {
         console.error('Message handling error:', error);
       }
