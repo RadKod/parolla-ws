@@ -30,19 +30,15 @@ try {
   // SSL sertifikalarını yükle
   const options = {
     key: fs.readFileSync('/app/ssl/privkey.pem'),
-    cert: fs.readFileSync('/app/ssl/fullchain.pem')
+    cert: fs.readFileSync('/app/ssl/fullchain.pem'),
+    // IP adresi için gerekli
+    rejectUnauthorized: false
   };
 
   // HTTPS sunucusu oluştur
   const server = https.createServer(options, (req, res) => {
     // CORS başlıklarını ayarla
-    const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['*'];
-    const origin = req.headers.origin;
-    
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin || '*');
-    }
-    
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
@@ -57,58 +53,52 @@ try {
   });
 
   // WebSocket sunucusunu HTTPS sunucusuna bağla
-  const wss = new WebSocket.Server({ 
-    server,
-    // WebSocket için CORS benzeri kontrol
-    verifyClient: (info, cb) => {
-      const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['*'];
-      const origin = info.origin || info.req.headers.origin;
-      
-      if (allowedOrigins.includes('*') || !origin || allowedOrigins.includes(origin)) {
-        cb(true);
-      } else {
-        console.log(`Reddedilen origin: ${origin}`);
-        cb(false, 403, 'Origin not allowed');
-      }
-    }
-  });
+  const wss = new WebSocket.Server({ server });
 
   // gameState'e WebSocket sunucusunu ekle
   gameState.wss = wss;
 
   // WebSocket bağlantılarını dinle
-  wss.on('connection', async (ws, req) => {
+  wss.on('connection', (ws, req) => {
     const ip = req.socket.remoteAddress;
     console.log(`Yeni WebSocket bağlantısı: ${ip}`);
     
+    // Token kontrolü
+    const parameters = url.parse(req.url, true).query;
+    const token = parameters.token;
+    
+    if (!token) {
+      console.log('Token eksik, bağlantı kapatılıyor');
+      ws.close(1008, 'Token required');
+      return;
+    }
+    
+    console.log('Bağlantı başarılı, token alındı');
+    
+    // Mevcut WebSocket işleyicileriniz...
+    ws.on('message', (message) => {
+      console.log(`Alınan mesaj: ${message}`);
+      try {
+        // Mesaj işleme...
+        ws.send(JSON.stringify({ type: 'echo', data: message.toString() }));
+      } catch (error) {
+        console.error('Mesaj işleme hatası:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      console.log(`Bağlantı kapatıldı: ${ip}`);
+    });
+    
+    ws.on('error', (error) => {
+      console.error(`WebSocket hatası: ${error.message}`);
+    });
+    
+    // Bağlantı başarılı mesajı
     try {
-      await handleConnection(wss, ws, req);
-
-      // Mesajları dinle
-      ws.on('message', async (message) => {
-        try {
-          // URL'den token parametresini al ve temizle
-          const { query } = url.parse(req.url, true);
-          const token = cleanToken(query.token);
-          if (!token) return;
-
-          const userData = await getUserFromAPI(token);
-          if (!userData) return;
-
-          handleMessage(ws, message.toString(), userData.id);
-        } catch (error) {
-          console.error('Message handling error:', error);
-        }
-      });
-
-      // Bağlantı hatalarını dinle
-      ws.on('error', (error) => {
-        console.error(`WebSocket hatası: ${error.message}`);
-      });
-
+      ws.send(JSON.stringify({ type: 'connection', status: 'success' }));
     } catch (error) {
-      console.error('Connection handling error:', error);
-      ws.close();
+      console.error('Bağlantı mesajı gönderme hatası:', error);
     }
   });
 
