@@ -7,6 +7,11 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 1881
+# SSL dizini oluştur
+RUN mkdir -p /app/ssl
 
-CMD ["node", "src/server.js"] 
+# Sertifikaları kopyala
+COPY ./ssl/privkey.pem /app/ssl/
+COPY ./ssl/fullchain.pem /app/ssl/
+
+CMD ["node", "src/server.js"]
