@@ -1,5 +1,8 @@
 require('dotenv').config();
 const WebSocket = require('ws');
+const fs = require('fs');
+const https = require('https');
+const http = require('http');
 const { PORT, HOST } = require('./config/api.config');
 const { handleConnection } = require('./handlers/connectionHandler');
 const { handleMessage } = require('./handlers/messageHandler');
@@ -24,13 +27,53 @@ function cleanToken(token) {
   return token.trim();
 }
 
-// WebSocket sunucusunu oluştur
-const wss = new WebSocket.Server({ 
-  port: PORT,
-  host: HOST,
-  clientTracking: true,
-  perMessageDeflate: false
-});
+// SSL sertifikası ve anahtar dosyalarının yolları
+const SSL_ENABLED = process.env.SSL_ENABLED === 'true';
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
+
+let server;
+let wss;
+
+// SSL etkinse HTTPS sunucusu oluştur, değilse HTTP sunucusu oluştur
+if (SSL_ENABLED && SSL_KEY_PATH && SSL_CERT_PATH) {
+  try {
+    const sslOptions = {
+      key: fs.readFileSync(SSL_KEY_PATH),
+      cert: fs.readFileSync(SSL_CERT_PATH),
+      minVersion: 'TLSv1.2'
+    };
+    server = https.createServer(sslOptions);
+    console.log('HTTPS server created with SSL');
+    
+    // WebSocket sunucusunu HTTPS sunucusuna bağla
+    wss = new WebSocket.Server({ 
+      server: server,
+      clientTracking: true,
+      perMessageDeflate: false
+    });
+  } catch (error) {
+    console.error('SSL dosyaları yüklenirken hata oluştu:', error.message);
+    console.log('HTTP sunucusu oluşturuluyor...');
+    
+    // WebSocket sunucusunu doğrudan port üzerinden oluştur
+    wss = new WebSocket.Server({ 
+      port: PORT,
+      host: HOST,
+      clientTracking: true,
+      perMessageDeflate: false
+    });
+  }
+} else {
+  // WebSocket sunucusunu doğrudan port üzerinden oluştur
+  wss = new WebSocket.Server({ 
+    port: PORT,
+    host: HOST,
+    clientTracking: true,
+    perMessageDeflate: false
+  });
+  console.log('WebSocket server created without SSL');
+}
 
 // gameState'e WebSocket sunucusunu ekle
 gameState.wss = wss;
@@ -76,11 +119,33 @@ wss.on('error', (error) => {
 });
 
 // Sunucuyu başlat ve oyunu başlat
-wss.on('listening', () => {
-  console.log(`WebSocket server running at ws://${HOST}:${PORT}`);
-  
-  // Oyunu başlat
-  initializeGame().catch(error => {
-    console.error('Oyun başlatma hatası:', error.message);
+if (server) {
+  // HTTPS sunucusu varsa onu başlat
+  server.listen(PORT, HOST, () => {
+    console.log(`WebSocket server running at wss://${HOST}:${PORT}`);
+    
+    // Oyunu başlat
+    initializeGame().catch(error => {
+      console.error('Oyun başlatma hatası:', error.message);
+    });
   });
+} else {
+  // Doğrudan WebSocket sunucusu başlatıldıysa
+  wss.on('listening', () => {
+    console.log(`WebSocket server running at ws://${HOST}:${PORT}`);
+    
+    // Oyunu başlat
+    initializeGame().catch(error => {
+      console.error('Oyun başlatma hatası:', error.message);
+    });
+  });
+}
+
+// Yakalanmamış hataları yakala
+process.on('uncaughtException', (error) => {
+  console.error('Yakalanmamış istisna:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('İşlenmeyen reddetme:', reason);
 }); 
