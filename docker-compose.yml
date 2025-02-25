@@ -7,14 +7,14 @@ services:
     restart: always
     ports:
       - "1881:1881"
-      - "443:443"  # SSL için standart port
+      - "8443:443"  # 443 yerine 8443 portunu kullan
     environment:
       - NODE_ENV=production
       - PORT=1881
       - HOST=0.0.0.0
       - API_URL=${API_URL}
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=https://parolla.app,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://parolla-ws.radkod.com,https://parolla-ws.radkod.com:1881,wss://parolla-ws.radkod.com:1881
+      - CORS_ORIGIN=https://parolla.app,http://localhost:3000,http://localhost:8080,http://localhost:5173,https://parolla-ws.radkod.com,https://parolla-ws.radkod.com:1881,wss://parolla-ws.radkod.com:1881,https://parolla-ws.radkod.com:8443,wss://parolla-ws.radkod.com:8443
       - SSL_KEY_PATH=/app/ssl/privkey.pem
       - SSL_CERT_PATH=/app/ssl/cert.pem
     volumes:
@@ -22,6 +22,7 @@ services:
       - ./ssl:/app/ssl
     networks:
       - parolla-network
+    network_mode: "host"  # port mapping yerine
 
 networks:
   parolla-network:
