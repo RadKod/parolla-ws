@@ -135,10 +135,7 @@ async function handleConnection(wss, ws, req) {
     const { query } = url.parse(req.url, true);
     const token = cleanToken(query.token);
 
-    console.log('Bağlantı isteği alındı, token:', token ? 'Mevcut' : 'Yok');
-
     if (!token) {
-      console.log('Token eksik, bağlantı kapatılıyor');
       sendToPlayer(ws, {
         type: MessageType.ERROR,
         message: 'Authentication required'
@@ -148,11 +145,8 @@ async function handleConnection(wss, ws, req) {
     }
 
     // Kullanıcı bilgilerini API'den al
-    console.log('Kullanıcı bilgileri alınıyor...');
     const userData = await getUserFromAPI(token);
-    
     if (!userData) {
-      console.log('Kullanıcı bilgileri alınamadı, bağlantı kapatılıyor');
       sendToPlayer(ws, {
         type: MessageType.ERROR,
         message: 'Invalid token or user not found'
@@ -161,7 +155,6 @@ async function handleConnection(wss, ws, req) {
       return;
     }
 
-    console.log('Kullanıcı doğrulandı:', userData.id);
     playerId = userData.id;
 
     // WebSocket nesnesine player ID'yi ekle
@@ -170,7 +163,6 @@ async function handleConnection(wss, ws, req) {
     // Eğer aynı kullanıcının önceki bağlantısı varsa kapat
     const existingPlayer = gameState.players.get(userData.id);
     if (existingPlayer) {
-      console.log('Kullanıcının önceki bağlantısı kapatılıyor:', userData.id);
       // Önceki bağlantıyı kapat
       if (existingPlayer.ws && existingPlayer.ws.readyState === WebSocket.OPEN) {
         existingPlayer.ws.terminate(); // force close
@@ -198,12 +190,9 @@ async function handleConnection(wss, ws, req) {
       // Önceki durumu geri yükle
       player.lives = previousState.lives;
       player.score = previousState.score;
-      
-      console.log('Kullanıcı yeniden bağlandı, önceki durum yüklendi:', userData.id);
     } else {
       // Yeni oyuncuyu oluştur
       player = new Player(ws, userData);
-      console.log('Yeni oyuncu oluşturuldu:', userData.id);
 
       // Eğer mevcut round'da can durumu varsa onu kullan
       if (gameState.currentQuestion) {
@@ -211,7 +200,6 @@ async function handleConnection(wss, ws, req) {
         const roundLives = gameState.roundLives.get(roundKey);
         if (roundLives !== undefined) {
           player.lives = roundLives;
-          console.log('Mevcut round can durumu yüklendi:', roundLives);
         }
       }
     }
@@ -322,8 +310,6 @@ async function handleConnection(wss, ws, req) {
       }
     });
 
-    console.log('Oyuncuya bağlantı bilgileri gönderildi:', userData.id);
-
     // Hoş geldin mesajını gönder
     sendToPlayer(ws, {
       type: MessageType.SYSTEM_MESSAGE,
@@ -331,9 +317,84 @@ async function handleConnection(wss, ws, req) {
       messageType: 'welcome'
     });
 
-    // Eğer mevcut bir soru varsa, yeni oyuncuya gönder
-    if (gameState.currentQuestion) {
-      console.log('Mevcut soru yeni oyuncuya gönderiliyor:', userData.id);
+    // İlk oyuncu bağlandığında oyunu başlat
+    if (gameState.players.size === 1) {
+      // Oyun durumu sıfırlanmışsa yeni soruya geç
+      if (!gameState.currentQuestion || !gameState.lastQuestionTime) {
+        // Kısa bir gecikme ile yeni soru gönder (oyuncunun bağlantısının tam oturması için)
+        setTimeout(() => {
+          if (gameState.players.size > 0) {
+            sendNewQuestion();
+          }
+        }, 1000);
+      } else {
+        const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+        
+        // Mevcut soruyu gönder
+        sendToPlayer(ws, {
+          type: MessageType.QUESTION,
+          question: {
+            id: gameState.currentQuestion.id,
+            question: gameState.currentQuestion.question,
+            letter: gameState.currentQuestion.letter
+          },
+          gameStatus: {
+            roundTime: gameState.ROUND_TIME,
+            questionNumber: gameState.questionIndex + 1,
+            totalQuestions: gameState.questions.length,
+            timestamp: gameState.lastQuestionTime,
+            remaining: timeInfo.remaining
+          }
+        });
+
+        // Eğer bekleme süresindeyse ve soru süresi bitmişse, bekleme süresini gönder
+        if (gameState.waitingStartTime && timeInfo.remaining <= 0) {
+          const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+          
+          // Eğer bekleme süresi de bitmişse yeni soruya geç
+          if (waitingTimeInfo.remaining <= 0) {
+            // Kısa bir gecikme ile yeni soru gönder
+            setTimeout(() => {
+              if (gameState.players.size > 0) {
+                sendNewQuestion();
+              }
+            }, 1000);
+          } else {
+            sendToPlayer(ws, {
+              type: MessageType.WAITING_NEXT,
+              time: waitingTimeInfo
+            });
+          }
+        }
+        // Değilse ve süre devam ediyorsa, süre güncellemesini başlat
+        else if (timeInfo.remaining > 0) {
+          // Süre güncellemesini hemen gönder
+          sendToPlayer(ws, {
+            type: MessageType.TIME_UPDATE,
+            time: timeInfo
+          });
+          
+          // Eğer interval yoksa başlat
+          if (!gameState.timeUpdateInterval) {
+            startTimeUpdateInterval();
+          }
+        } else {
+          // Süre bitmişse yeni soruya geç
+          sendNewQuestion();
+        }
+      }
+    } 
+    // Mevcut soru varsa yeni bağlanan oyuncuya gönder
+    else if (gameState.currentQuestion) {
+      const timeInfo = getRemainingTime(gameState.lastQuestionTime);
+      
+      // Eğer süre bitmişse ve bekleme süresinde değilse yeni soruya geç
+      if (timeInfo.remaining <= 0 && !gameState.waitingStartTime) {
+        sendNewQuestion();
+        return;
+      }
+
+      // Mevcut soruyu gönder
       sendToPlayer(ws, {
         type: MessageType.QUESTION,
         question: {
@@ -345,32 +406,38 @@ async function handleConnection(wss, ws, req) {
           roundTime: gameState.ROUND_TIME,
           questionNumber: gameState.questionIndex + 1,
           totalQuestions: gameState.questions.length,
-          timestamp: gameState.lastQuestionTime
+          timestamp: gameState.lastQuestionTime,
+          remaining: timeInfo.remaining
         }
       });
 
-      // Kalan süreyi hesapla ve gönder
-      const timeInfo = getRemainingTime(gameState.lastQuestionTime);
-      if (timeInfo.remaining > 0) {
+      // Eğer bekleme süresindeyse ve soru süresi bitmişse, bekleme süresini gönder
+      if (gameState.waitingStartTime && timeInfo.remaining <= 0) {
+        const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
+        
+        // Eğer bekleme süresi de bitmişse yeni soruya geç
+        if (waitingTimeInfo.remaining <= 0) {
+          sendNewQuestion();
+        } else {
+          sendToPlayer(ws, {
+            type: MessageType.WAITING_NEXT,
+            time: waitingTimeInfo
+          });
+        }
+      }
+      // Değilse ve süre devam ediyorsa, süre güncellemesini başlat
+      else if (timeInfo.remaining > 0) {
+        // Süre güncellemesini hemen gönder
         sendToPlayer(ws, {
           type: MessageType.TIME_UPDATE,
           time: timeInfo
         });
+        
+        // Eğer interval yoksa başlat
+        if (!gameState.timeUpdateInterval) {
+          startTimeUpdateInterval();
+        }
       }
-      // Eğer bekleme süresindeyse
-      else if (gameState.waitingStartTime) {
-        const waitingTimeInfo = getRemainingWaitingTime(gameState.waitingStartTime);
-        sendToPlayer(ws, {
-          type: MessageType.WAITING_NEXT,
-          time: waitingTimeInfo
-        });
-      }
-    }
-    // Eğer mevcut soru yoksa ve oyuncular varsa, yeni soru gönder
-    else if (gameState.players.size > 0) {
-      console.log('Yeni soru gönderiliyor...');
-      // Yeni soru gönder
-      sendNewQuestion();
     }
   } catch (error) {
     console.error('Connection handling error:', error);

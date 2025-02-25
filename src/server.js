@@ -1,8 +1,5 @@
 require('dotenv').config();
 const WebSocket = require('ws');
-const fs = require('fs');
-const https = require('https');
-const http = require('http');
 const { PORT, HOST } = require('./config/api.config');
 const { handleConnection } = require('./handlers/connectionHandler');
 const { handleMessage } = require('./handlers/messageHandler');
@@ -27,36 +24,10 @@ function cleanToken(token) {
   return token.trim();
 }
 
-// SSL sertifikası ve anahtar dosyalarının yolları
-const SSL_ENABLED = process.env.SSL_ENABLED === 'true';
-const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
-const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
-
-let server;
-
-// SSL etkinse HTTPS sunucusu oluştur, değilse HTTP sunucusu oluştur
-if (SSL_ENABLED && SSL_KEY_PATH && SSL_CERT_PATH) {
-  try {
-    const sslOptions = {
-      key: fs.readFileSync(SSL_KEY_PATH),
-      cert: fs.readFileSync(SSL_CERT_PATH),
-      minVersion: 'TLSv1.2'
-    };
-    server = https.createServer(sslOptions);
-    console.log('HTTPS server created with SSL');
-  } catch (error) {
-    console.error('SSL dosyaları yüklenirken hata oluştu:', error.message);
-    console.log('HTTP sunucusu oluşturuluyor...');
-    server = http.createServer();
-  }
-} else {
-  server = http.createServer();
-  console.log('HTTP server created without SSL');
-}
-
 // WebSocket sunucusunu oluştur
 const wss = new WebSocket.Server({ 
-  server: server,
+  port: PORT,
+  host: HOST,
   clientTracking: true,
   perMessageDeflate: false
 });
@@ -74,15 +45,15 @@ wss.on('connection', async (ws, req) => {
     // Mesajları dinle
     ws.on('message', async (message) => {
       try {
-        // Oyuncu ID'sini WebSocket nesnesinden al
-        const playerId = ws._playerId;
-        if (!playerId) {
-          console.error('Mesaj işleme hatası: Oyuncu ID bulunamadı');
-          return;
-        }
-        
-        // Mesajı işle
-        handleMessage(ws, message.toString(), playerId);
+        // URL'den token parametresini al ve temizle
+        const { query } = url.parse(req.url, true);
+        const token = cleanToken(query.token);
+        if (!token) return;
+
+        const userData = await getUserFromAPI(token);
+        if (!userData) return;
+
+        handleMessage(ws, message.toString(), userData.id);
       } catch (error) {
         console.error('Message handling error:', error);
       }
@@ -105,21 +76,11 @@ wss.on('error', (error) => {
 });
 
 // Sunucuyu başlat ve oyunu başlat
-server.listen(PORT, HOST, () => {
-  const protocol = SSL_ENABLED ? 'wss' : 'ws';
-  console.log(`WebSocket server running at ${protocol}://${HOST}:${PORT}`);
+wss.on('listening', () => {
+  console.log(`WebSocket server running at ws://${HOST}:${PORT}`);
   
   // Oyunu başlat
   initializeGame().catch(error => {
     console.error('Oyun başlatma hatası:', error.message);
   });
-});
-
-// Yakalanmamış hataları yakala
-process.on('uncaughtException', (error) => {
-  console.error('Yakalanmamış istisna:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('İşlenmeyen reddetme:', reason);
 }); 
