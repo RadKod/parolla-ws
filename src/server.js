@@ -77,31 +77,55 @@ try {
     
     console.log('Bağlantı başarılı, token alındı');
     
-    // Mevcut WebSocket işleyicileriniz...
-    ws.on('message', (message) => {
-      console.log(`Alınan mesaj: ${message}`);
-      try {
-        // Mesaj işleme...
-        ws.send(JSON.stringify({ type: 'echo', data: message.toString() }));
-      } catch (error) {
-        console.error('Mesaj işleme hatası:', error);
-      }
-    });
+    // Token temizleme
+    const cleanedToken = cleanToken(token);
+    
+    // Kullanıcı kimlik doğrulama
+    getUserFromAPI(cleanedToken)
+      .then(user => {
+        if (!user) {
+          console.log('Geçersiz token, bağlantı kapatılıyor');
+          ws.close(1008, 'Invalid token');
+          return;
+        }
+        
+        console.log(`Kullanıcı doğrulandı: ${user.id}`);
+        ws.userId = user.id;
+        
+        // Bağlantı işleyicisini çağır
+        handleConnection(ws, user);
+        
+        // Mesaj işleyicisini ayarla
+        ws.on('message', (message) => {
+          console.log(`Alınan mesaj: ${message}`);
+          try {
+            // Orijinal mesaj işleme mantığını kullan
+            handleMessage(ws, message, user);
+          } catch (error) {
+            console.error('Mesaj işleme hatası:', error);
+          }
+        });
+        
+        // Bağlantı başarılı mesajı
+        try {
+          ws.send(JSON.stringify({ type: 'connection', status: 'success', user }));
+        } catch (error) {
+          console.error('Bağlantı mesajı gönderme hatası:', error);
+        }
+      })
+      .catch(error => {
+        console.error('Kimlik doğrulama hatası:', error);
+        ws.close(1008, 'Authentication failed');
+      });
     
     ws.on('close', () => {
       console.log(`Bağlantı kapatıldı: ${ip}`);
+      // Kullanıcının bağlantı kesildikten sonra gereken işlemleri yap
     });
     
     ws.on('error', (error) => {
       console.error(`WebSocket hatası: ${error.message}`);
     });
-    
-    // Bağlantı başarılı mesajı
-    try {
-      ws.send(JSON.stringify({ type: 'connection', status: 'success' }));
-    } catch (error) {
-      console.error('Bağlantı mesajı gönderme hatası:', error);
-    }
   });
 
   // WebSocket sunucusu hata yönetimi
@@ -116,7 +140,7 @@ try {
     console.log(`Güvenli WebSocket sunucusu çalışıyor: wss://${HOST}:${PORT}`);
     console.log(`İzin verilen originler: ${process.env.CORS_ORIGIN || '*'}`);
     
-    // Oyunu başlat
+    // Oyunu başlat - bunun çalıştığından emin olalım
     initializeGame().catch(error => {
       console.error('Oyun başlatma hatası:', error.message);
     });
