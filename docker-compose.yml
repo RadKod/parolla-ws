@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3'
 
 services:
   parolla-ws:
@@ -19,6 +19,12 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./ssl:/app/ssl
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     networks:
       - parolla-network
 
