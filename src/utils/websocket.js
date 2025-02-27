@@ -144,6 +144,9 @@ function sendSystemMessage(wss, message, messageType, excludePlayerIds = [], add
       isSystem: true
     };
 
+    // Sistem mesajını gönder - her durumda anlık olarak gönderilir
+    broadcast(wss, systemMessage, excludePlayerIds, true);
+
     // Chat mesajı olarak da gönder
     if (addToChat) {
       const chatMessage = {
@@ -155,19 +158,22 @@ function sendSystemMessage(wss, message, messageType, excludePlayerIds = [], add
         isSystem: true
       };
 
-      // Chat geçmişine ekle
-      const gameState = require('../state/gameState');
-      if (gameState.chatHistory.length >= 100) {
-        gameState.chatHistory.shift(); // En eski mesajı kaldır
-      }
-      gameState.chatHistory.push(chatMessage);
+      // Oyuncu giriş/çıkış mesajlarını geçmişe ekleme
+      const skipMessageTypes = ['player_joined', 'player_left'];
+      const shouldAddToHistory = !skipMessageTypes.includes(messageType);
 
-      // Chat mesajını gönder
+      if (shouldAddToHistory) {
+        // Chat geçmişine ekle
+        const gameState = require('../state/gameState');
+        if (gameState.chatHistory.length >= 100) {
+          gameState.chatHistory.shift(); // En eski mesajı kaldır
+        }
+        gameState.chatHistory.push(chatMessage);
+      }
+
+      // Chat mesajını gönder - her durumda anlık olarak gönderilir
       broadcast(wss, chatMessage, excludePlayerIds, true);
     }
-
-    // Sistem mesajını gönder
-    broadcast(wss, systemMessage, excludePlayerIds, true);
   } catch (error) {
     console.error('Send system message error:', error);
   }

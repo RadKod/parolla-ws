@@ -179,11 +179,14 @@ function setupChatHistoryCleaner() {
 function cleanChatHistory() {
   const gameState = require('./state/gameState');
   
+  // Mevcut chat geçmişini al
+  const chatHistory = gameState.chatHistory || [];
+  
   // Temizlemeden önce kaç mesaj olduğunu kaydet
-  const messageCount = gameState.chatHistory ? gameState.chatHistory.length : 0;
+  const oldMessageCount = chatHistory.length;
   
   // Chat geçmişini boş bir dizi ile değiştir
   gameState.chatHistory = [];
   
-  console.log(`Chat geçmişi temizlendi. ${messageCount} mesaj silindi. ${new Date().toLocaleString('tr-TR')}`);
+  console.log(`Chat geçmişi temizlendi. ${oldMessageCount} mesaj silindi. ${new Date().toLocaleString('tr-TR')}`);
 } 
