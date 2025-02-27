@@ -91,8 +91,27 @@ function handleMessage(ws, message, playerId) {
       
       gameState.chatHistory.push(chatMessage);
       
+      // Debug bilgisi - kaç tane istemci var?
+      const totalClients = gameState.wss?.clients?.size || 0;
+      const activeClients = Array.from(gameState.wss?.clients || []).filter(c => c.readyState === 1).length;
+      const viewers = Array.from(gameState.wss?.clients || []).filter(c => c._isViewer).length;
+      const players = Array.from(gameState.wss?.clients || []).filter(c => !c._isViewer).length;
+      
+      console.log(`Chat Broadcast Info: 
+        Total Clients: ${totalClients}, 
+        Active: ${activeClients}, 
+        Viewers: ${viewers}, 
+        Players: ${players}`);
+      
       // Tüm oyunculara ve izleyicilere mesajı gönder
       broadcast(gameState.wss, chatMessage, [], true);
+      
+      // Alternatif mesaj tipinde de gönder (v2)
+      const chatMessageV2 = {
+        ...chatMessage,
+        type: MessageType.CHAT_MESSAGE_V2
+      };
+      broadcast(gameState.wss, chatMessageV2, [], true);
       
       console.log(`Chat: ${player.name}: ${data.message}`);
       break;
