@@ -123,6 +123,9 @@ wss.on('error', (error) => {
     initializeGame().catch(error => {
       console.error('Oyun başlatma hatası:', error.message);
     });
+    
+    // Chat geçmişini her 24 saatte bir temizle
+    setupChatHistoryCleaner();
   });
   
   // Hata yakalama
@@ -141,4 +144,46 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('İşlenmeyen reddetme:', reason);
-}); 
+});
+
+/**
+ * Chat geçmişini düzenli olarak temizlemek için zamanlayıcı oluşturur
+ */
+function setupChatHistoryCleaner() {
+  const gameState = require('./state/gameState');
+  
+  // İlk temizleme zamanını hesapla (bir sonraki gece yarısı)
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setDate(nextMidnight.getDate() + 1);
+  nextMidnight.setHours(0, 0, 0, 0);
+  
+  // İlk çalıştırmaya kadar beklenecek süre (milisaniye cinsinden)
+  const initialDelay = nextMidnight.getTime() - now.getTime();
+  
+  console.log(`Chat geçmişi temizleme zamanlayıcısı kuruldu. İlk temizleme ${new Date(now.getTime() + initialDelay).toLocaleString('tr-TR')} tarihinde yapılacak.`);
+  
+  // İlk zamanlayıcıyı kur
+  setTimeout(() => {
+    // Chat geçmişini temizle
+    cleanChatHistory();
+    
+    // Sonraki günlük temizlemeleri ayarla (her 24 saatte bir)
+    setInterval(cleanChatHistory, 24 * 60 * 60 * 1000);
+  }, initialDelay);
+}
+
+/**
+ * Chat geçmişini temizler
+ */
+function cleanChatHistory() {
+  const gameState = require('./state/gameState');
+  
+  // Temizlemeden önce kaç mesaj olduğunu kaydet
+  const messageCount = gameState.chatHistory ? gameState.chatHistory.length : 0;
+  
+  // Chat geçmişini boş bir dizi ile değiştir
+  gameState.chatHistory = [];
+  
+  console.log(`Chat geçmişi temizlendi. ${messageCount} mesaj silindi. ${new Date().toLocaleString('tr-TR')}`);
+} 
