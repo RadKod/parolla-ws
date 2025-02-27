@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const MessageType = require('../constants/messageTypes');
 const Player = require('../models/Player');
 const { getUserFromAPI } = require('../services/authService');
-const { broadcast, sendToPlayer, broadcastToViewers } = require('../utils/websocket');
+const { broadcast, sendToPlayer, broadcastToViewers, sendSystemMessage } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const gameState = require('../state/gameState');
 const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
@@ -108,11 +108,7 @@ function handleDisconnect(playerId) {
     });
 
     // Sistem mesajını gönder
-    broadcast(gameState.wss, {
-      type: MessageType.SYSTEM_MESSAGE,
-      message: `${player.name} oyundan ayrıldı`,
-      messageType: 'player_left'
-    });
+    sendSystemMessage(gameState.wss, `${player.name} oyundan ayrıldı`, 'player_left');
   } catch (error) {
     console.error('Disconnect handling error:', error);
   }
@@ -229,7 +225,8 @@ async function handleConnection(wss, ws, req) {
           maxLives: gameState.MAX_LIVES,
           totalQuestions: gameState.questions.length,
           viewerCount: gameState.viewerCount
-        }
+        },
+        chatHistory: gameState.chatHistory || []
       });
 
       // Eğer mevcut bir soru varsa, izleyiciye gönder
@@ -378,9 +375,10 @@ async function handleConnection(wss, ws, req) {
     const gameStatus = composeGameStatusLog();
     console.log('Game Status:', JSON.stringify(gameStatus, null, 2));
 
-    // Diğer oyunculara yeni oyuncunun katıldığını bildir
+    // Diğer oyunculara bildir
     broadcast(gameState.wss, {
       type: MessageType.PLAYER_JOINED,
+      playerId: playerId,
       isPlayerUpdate: true,
       player: {
         id: player.id,
@@ -388,8 +386,7 @@ async function handleConnection(wss, ws, req) {
         fingerprint: player.fingerprint,
         is_permanent: player.is_permanent,
         lives: player.lives,
-        score: player.score,
-        lastConnectionTime: player.lastConnectionTime
+        score: player.score
       },
       playerList: Array.from(gameState.players.values()).map(p => ({
         id: p.id,
@@ -400,26 +397,17 @@ async function handleConnection(wss, ws, req) {
         score: p.score,
         lastConnectionTime: p.lastConnectionTime,
         isOnline: p.ws.readyState === WebSocket.OPEN
-      })),
-      gameInfo: {
-        roundTime: gameState.ROUND_TIME,
-        maxLives: gameState.MAX_LIVES,
-        totalQuestions: gameState.questions.length,
-        viewerCount: gameState.viewerCount || 0
-      }
-    }, [player.id], false); // Yeni katılan oyuncuya gönderme
+      }))
+    });
 
     // Sistem mesajını gönder
-    broadcast(gameState.wss, {
-      type: MessageType.SYSTEM_MESSAGE,
-      message: `${player.name} oyuna katıldı`,
-      messageType: 'player_joined'
-    }, [player.id], false);
+    sendSystemMessage(gameState.wss, `${player.name} oyuna katıldı`, 'player_joined', [player.id]);
 
-    // Oyuncuya bilgilerini gönder
-    sendToPlayer(ws, {
+    // Socket'e bağlantı başarılı bilgisini gönder
+    sendToPlayer(player.ws, {
       type: MessageType.CONNECTED,
-      isPlayerUpdate: true,
+      message: 'Successfully connected',
+      playerId: player.id,
       player: {
         id: player.id,
         name: player.name,
@@ -443,8 +431,9 @@ async function handleConnection(wss, ws, req) {
         roundTime: gameState.ROUND_TIME,
         maxLives: gameState.MAX_LIVES,
         totalQuestions: gameState.questions.length,
-        viewerCount: gameState.viewerCount || 0
-      }
+        viewerCount: gameState.viewerCount
+      },
+      chatHistory: gameState.chatHistory || []
     });
 
     // Hoş geldin mesajını gönder

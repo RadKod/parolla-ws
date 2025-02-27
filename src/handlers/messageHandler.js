@@ -2,6 +2,7 @@ const MessageType = require('../constants/messageTypes');
 const { sendToPlayer } = require('../utils/websocket');
 const gameState = require('../state/gameState');
 const { handleAnswer } = require('./gameHandler');
+const { broadcast } = require('../utils/websocket');
 
 /**
  * WebSocket mesajlarını işler
@@ -49,6 +50,51 @@ function handleMessage(ws, message, playerId) {
         return;
       }
       handleAnswer(player, data.answer);
+      break;
+
+    case MessageType.CHAT_MESSAGE:
+      if (!data.message || typeof data.message !== 'string' || data.message.trim() === '') {
+        sendToPlayer(ws, {
+          type: MessageType.ERROR,
+          message: 'Geçersiz mesaj formatı'
+        });
+        return;
+      }
+      
+      // Mesajın maksimum uzunluğunu kontrol et
+      if (data.message.length > 500) {
+        sendToPlayer(ws, {
+          type: MessageType.ERROR,
+          message: 'Mesaj çok uzun (maksimum 500 karakter)'
+        });
+        return;
+      }
+      
+      const chatMessage = {
+        type: MessageType.CHAT_MESSAGE,
+        playerId: playerId,
+        playerName: player.name,
+        message: data.message,
+        timestamp: Date.now(),
+        isSystem: false
+      };
+      
+      // Mesajı chat geçmişine ekle
+      if (!gameState.chatHistory) {
+        gameState.chatHistory = [];
+      }
+      
+      // Chat geçmişini sınırla (son 100 mesaj)
+      if (gameState.chatHistory.length >= 100) {
+        gameState.chatHistory.shift(); // En eski mesajı kaldır
+      }
+      
+      gameState.chatHistory.push(chatMessage);
+      
+      // Tüm oyunculara ve izleyicilere mesajı gönder
+      broadcast(gameState.wss, chatMessage, [], true);
+      
+      console.log(`Chat: ${player.name}: ${data.message}`);
       break;
 
     default:

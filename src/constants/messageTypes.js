@@ -46,5 +46,11 @@ module.exports = {
   SYSTEM_MESSAGE: 'system_message',
   
   /** İzleyici sayısı güncellemesini bildirir */
-  VIEWER_COUNT_UPDATE: 'viewer_count_update'
+  VIEWER_COUNT_UPDATE: 'viewer_count_update',
+  
+  /** Kullanıcının chat mesajı gönderdiğini bildirir */
+  CHAT_MESSAGE: 'chat_message',
+  
+  /** Tüm chat mesajlarını bildirir */
+  CHAT_HISTORY: 'chat_history'
 }; 

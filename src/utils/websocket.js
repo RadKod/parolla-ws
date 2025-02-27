@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const MessageType = require('../constants/messageTypes');
 
 /**
  * Tüm bağlı istemcilere mesaj gönderir
@@ -120,8 +121,61 @@ function broadcastToViewers(wss, message) {
   }
 }
 
+/**
+ * Sistem mesajı oluşturur ve tüm oyunculara gönderir
+ * @param {WebSocket.Server} wss WebSocket sunucusu
+ * @param {string} message Sistem mesajı metni
+ * @param {string} messageType Sistem mesajı tipi
+ * @param {Array<string>} [excludePlayerIds] Mesajı almayacak oyuncuların ID'leri
+ * @param {boolean} [addToChat=true] Mesajı chat geçmişine eklenip eklenmeyeceği
+ */
+function sendSystemMessage(wss, message, messageType, excludePlayerIds = [], addToChat = true) {
+  if (!wss || !wss.clients) {
+    console.error('Invalid WebSocket server or no clients');
+    return;
+  }
+
+  try {
+    const systemMessage = {
+      type: MessageType.SYSTEM_MESSAGE,
+      message: message,
+      messageType: messageType,
+      timestamp: Date.now(),
+      isSystem: true
+    };
+
+    // Chat mesajı olarak da gönder
+    if (addToChat) {
+      const chatMessage = {
+        type: MessageType.CHAT_MESSAGE,
+        playerId: 'system',
+        playerName: 'Sistem',
+        message: message,
+        timestamp: Date.now(),
+        isSystem: true
+      };
+
+      // Chat geçmişine ekle
+      const gameState = require('../state/gameState');
+      if (gameState.chatHistory.length >= 100) {
+        gameState.chatHistory.shift(); // En eski mesajı kaldır
+      }
+      gameState.chatHistory.push(chatMessage);
+
+      // Chat mesajını gönder
+      broadcast(wss, chatMessage, excludePlayerIds, true);
+    }
+
+    // Sistem mesajını gönder
+    broadcast(wss, systemMessage, excludePlayerIds, true);
+  } catch (error) {
+    console.error('Send system message error:', error);
+  }
+}
+
 module.exports = {
   broadcast,
   sendToPlayer,
-  broadcastToViewers
+  broadcastToViewers,
+  sendSystemMessage
 }; 

@@ -72,6 +72,9 @@ const gameState = {
   // Süre güncellemesi için interval
   timeUpdateInterval: null,
 
+  // Chat mesaj geçmişi
+  chatHistory: [],
+
   // Oyun ayarları
   ROUND_TIME,
   MAX_LIVES,
