@@ -10,25 +10,17 @@ const MessageType = require('../constants/messageTypes');
  */
 function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) {
   if (!wss || !wss.clients) {
-    console.error('Invalid WebSocket server or no clients:', wss?.clients?.size);
+    console.error('Invalid WebSocket server or no clients');
     return;
   }
 
   try {
     const jsonMessage = JSON.stringify(message);
     const clients = Array.from(wss.clients);
-    let sentCount = 0;
-    let viewerSentCount = 0;
-    let playerSentCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-    let notOpenCount = 0;
-    let excludedCount = 0;
     
     for (const client of clients) {
       try {
         if (client.readyState !== WebSocket.OPEN) {
-          notOpenCount++;
           continue;
         }
 
@@ -36,10 +28,6 @@ function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) 
         if (client._isViewer) {
           if (includeViewers) {
             client.send(jsonMessage);
-            sentCount++;
-            viewerSentCount++;
-          } else {
-            skippedCount++;
           }
           continue;
         }
@@ -47,15 +35,11 @@ function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) 
         // Player ID kontrolü
         const playerId = client._playerId;
         if (!playerId || excludePlayerIds.includes(playerId)) {
-          excludedCount++;
           continue;
         }
 
         client.send(jsonMessage);
-        sentCount++;
-        playerSentCount++;
       } catch (error) {
-        errorCount++;
         console.error('Error sending to client:', error);
         try {
           client.terminate();
@@ -63,19 +47,6 @@ function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) 
           console.error('Client termination error:', e);
         }
       }
-    }
-    
-    // Debug bilgisi - kaç istemciye mesaj gönderildi
-    if (message.type === 'chat_message' || message.type === 'chat_message_v2') {
-      console.log(`Broadcast details for ${message.type}:
-        - Total clients: ${clients.length}
-        - Messages sent: ${sentCount} (${playerSentCount} players, ${viewerSentCount} viewers)
-        - Skipped (viewer mode): ${skippedCount}
-        - Not open connections: ${notOpenCount}
-        - Excluded players: ${excludedCount}
-        - Errors: ${errorCount}
-        - Message content: ${message.message && message.message.length > 100 ? message.message.substring(0, 100) + '...' : message.message}
-      `);
     }
   } catch (error) {
     console.error('Broadcast error:', error);

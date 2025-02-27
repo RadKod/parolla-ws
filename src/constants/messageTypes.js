@@ -52,8 +52,5 @@ module.exports = {
   CHAT_MESSAGE: 'chat_message',
   
   /** Tüm chat mesajlarını bildirir */
-  CHAT_HISTORY: 'chat_history',
-  
-  /** Kullanıcının chat mesajı gönderdiğini bildirir (alternatif versiyon) */
-  CHAT_MESSAGE_V2: 'chat_message_v2'
+  CHAT_HISTORY: 'chat_history'
 }; 
