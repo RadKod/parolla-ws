@@ -235,6 +235,8 @@ function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) 
   }
 
   try {
+    console.log(`addRecentAnswer: ${player.name} için çağrıldı, isCorrect=${isCorrect}, questionIndex=${questionIndex}`);
+    
     // Eğer responseTime belirtilmemişse hesapla
     const roundKey = `${questionIndex}_${player.id}`;
     const actualResponseTime = responseTime !== null ? responseTime : 
@@ -268,11 +270,11 @@ function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) 
     }
     
     // Debug log - doğru cevaplarda sorun olabilir
-    console.log(`Recent Answer added: ${player.name}, isCorrect: ${isCorrect}, totalScore: ${player.score}, recentAnswers.length: ${gameState.recentAnswers.length}`);
+    console.log(`Recent Answer added: ${player.name}, isCorrect: ${isCorrect}, totalScore: ${player.score}, recentAnswers.length: ${gameState.recentAnswers.length}, eklenen veriler: ${JSON.stringify(recentAnswer)}`);
     
     return gameState.recentAnswers;
   } catch (error) {
-    console.error('addRecentAnswer hata:', error.message);
+    console.error('addRecentAnswer hata:', error.message, error.stack);
     return gameState.recentAnswers || [];
   }
 }

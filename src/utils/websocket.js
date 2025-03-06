@@ -66,14 +66,21 @@ function sendToPlayer(ws, message) {
 
   try {
     if (ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not open');
+      console.error(`WebSocket is not open (readyState=${ws.readyState}), message type=${message.type}`);
       return;
     }
 
     const jsonMessage = JSON.stringify(message);
+    
+    // ANSWER_RESULT mesajları için özel kontrol
+    if (message.type === 'ANSWER_RESULT') {
+      const isCorrect = message.correct;
+      console.log(`sendToPlayer ANSWER_RESULT: correct=${isCorrect}, msg-length=${jsonMessage.length}`);
+    }
+    
     ws.send(jsonMessage);
   } catch (error) {
-    console.error('SendToPlayer error:', error);
+    console.error(`SendToPlayer error (message type=${message.type}):`, error);
     try {
       ws.terminate();
     } catch (e) {

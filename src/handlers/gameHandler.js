@@ -508,25 +508,29 @@ function handleAnswer(player, answer) {
     });
     
     console.log(`${player.name} puanı güncellendi: ${player.score}`);
+    console.log(`DOĞRU CEVAP KONTROLÜ: isCorrect değeri = ${isCorrect}, roundKey = ${roundKey}`);
   }
 
   // ******* KRİTİK BÖLGE *******
   // Bu kısım kesinlikle çalışmalı ve isCorrect değerine göre farklı işlem yapmamalı
 
   // Son cevaplar listesini güncelle
-  console.log(`Recent Answers güncelleniyor... isCorrect=${isCorrect}`);
+  console.log(`Recent Answers güncelleniyor... cevap=${isCorrect ? 'DOĞRU' : 'YANLIŞ'}, isCorrect değeri=${isCorrect}`);
   const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex, responseTime);
   
-  // Recent Answers mesajını broadcast et - HER DURUMDA
+  // Recent Answers mesajını broadcast et - HEM DOĞRU HEM YANLIŞ CEVAPTA
+  console.log(`Broadcast öncesi: isCorrect=${isCorrect}, player=${player.name}, recentAnswers.length=${recentAnswers ? recentAnswers.length : 0}`);
   broadcast(gameState.wss, {
     type: MessageType.RECENT_ANSWERS,
     answers: recentAnswers
   }, [], true);
   
-  console.log(`Recent Answers broadcast edildi, toplam ${recentAnswers.length} cevap`);
+  console.log(`Recent Answers broadcast edildi (${isCorrect ? 'DOĞRU' : 'YANLIŞ'} cevap için), toplam ${recentAnswers.length} cevap, WebSocket çalışıyor mu: ${player.ws.readyState === 1}`);
 
-  // Cevap sonucunu oyuncuya gönder - HER DURUMDA  
-  sendToPlayer(player.ws, {
+  // Cevap sonucunu oyuncuya gönder - HEM DOĞRU HEM YANLIŞ CEVAPTA 
+  console.log(`ANSWER_RESULT göndermeden önce: isCorrect=${isCorrect}, player=${player.name}, lives=${player.lives}, score=${player.score}`);
+  
+  const answerResultMessage = {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
     lives: player.lives,
@@ -537,9 +541,14 @@ function handleAnswer(player, answer) {
     attemptCount: currentAttempts,
     timestamp: Date.now(),
     answerTimeDescription: `${Math.floor(responseTime / 1000)} saniyede cevaplandı`
-  });
+  };
   
-  console.log(`Answer Result gönderildi: doğru=${isCorrect}, can=${player.lives}, puan=${player.score}`);
+  try {
+    sendToPlayer(player.ws, answerResultMessage);
+    console.log(`Answer Result başarıyla gönderildi (${isCorrect ? 'DOĞRU' : 'YANLIŞ'} cevap için): can=${player.lives}, puan=${player.score}, full data=${JSON.stringify(answerResultMessage)}`);
+  } catch (error) {
+    console.error(`ANSWER_RESULT gönderirken hata oluştu (${player.name}): ${error.message}`);
+  }
   
   // Cevap logu
   const answerLog = composeGameEventLog('player_answer', {
