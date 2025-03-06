@@ -471,9 +471,6 @@ function handleAnswer(player, answer) {
     gameState.playerScores.set(player.id, playerScoreData);
   }
 
-  // Her cevap için son cevaplar listesini sıfırla, sadece bu cevabı göster
-  gameState.recentAnswers = [];
-  
   // Son cevaplar listesine ekle
   const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex);
   

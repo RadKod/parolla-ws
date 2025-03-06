@@ -179,9 +179,9 @@ function addRecentAnswer(player, isCorrect, questionIndex) {
   // Son cevaplar listesinin başına ekle (en yeni en üstte)
   gameState.recentAnswers.unshift(recentAnswer);
   
-  // Maksimum 20 cevap tutulacak
-  if (gameState.recentAnswers.length > 20) {
-    gameState.recentAnswers.pop(); // En eski cevabı sil
+  // Maksimum 50 cevap tutulacak (tek bir soru için)
+  if (gameState.recentAnswers.length > 50) {
+    gameState.recentAnswers = gameState.recentAnswers.slice(0, 50); // Sadece ilk 50 cevabı tut
   }
   
   return gameState.recentAnswers;
@@ -192,9 +192,9 @@ function addRecentAnswer(player, isCorrect, questionIndex) {
  * @param {number} limit Döndürülecek maksimum cevap sayısı
  * @returns {Array} Son cevaplar listesi
  */
-function getRecentAnswers(limit = 20) {
+function getRecentAnswers(limit = 50) {
   // Listenin başından belirtilen limit kadar cevabı döndür
-  return gameState.recentAnswers.slice(0, limit);
+  return gameState.recentAnswers ? gameState.recentAnswers.slice(0, limit) : [];
 }
 
 /**
