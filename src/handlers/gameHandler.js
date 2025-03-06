@@ -66,6 +66,15 @@ function sendNewQuestion() {
   
   // Puanlama sistemi için sıfırlama yap
   resetRoundScoring();
+  
+  // Son cevaplar listesini sıfırla
+  gameState.recentAnswers = [];
+  
+  // Son cevaplar listesinin sıfırlandığını bildir
+  broadcast(gameState.wss, {
+    type: MessageType.RECENT_ANSWERS,
+    answers: []
+  }, [], true);
 
   // Tüm oyuncuların canlarını yenile
   for (const [_, player] of gameState.players) {
@@ -462,6 +471,9 @@ function handleAnswer(player, answer) {
     gameState.playerScores.set(player.id, playerScoreData);
   }
 
+  // Her cevap için son cevaplar listesini sıfırla, sadece bu cevabı göster
+  gameState.recentAnswers = [];
+  
   // Son cevaplar listesine ekle
   const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex);
   
@@ -540,6 +552,12 @@ async function handleGameRestart() {
   
   // Son cevaplar listesini de sıfırla
   gameState.recentAnswers = [];
+  
+  // Son cevaplar listesinin sıfırlandığını bildir
+  broadcast(gameState.wss, {
+    type: MessageType.RECENT_ANSWERS,
+    answers: []
+  }, [], true);
 
   if (gameState.roundTimer) {
     clearTimeout(gameState.roundTimer);

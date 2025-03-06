@@ -171,6 +171,11 @@ function addRecentAnswer(player, isCorrect, questionIndex) {
     timestamp: Date.now()
   };
   
+  // Eğer liste henüz oluşturulmamışsa oluştur
+  if (!gameState.recentAnswers) {
+    gameState.recentAnswers = [];
+  }
+  
   // Son cevaplar listesinin başına ekle (en yeni en üstte)
   gameState.recentAnswers.unshift(recentAnswer);
   
