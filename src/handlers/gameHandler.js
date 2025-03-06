@@ -69,6 +69,7 @@ function sendNewQuestion() {
   
   // Son cevaplar listesini sıfırla
   gameState.recentAnswers = [];
+  console.log("Yeni soru için recent_answers sıfırlandı");
   
   // Son cevaplar listesinin sıfırlandığını bildir
   broadcast(gameState.wss, {
@@ -441,6 +442,17 @@ function handleAnswer(player, answer) {
         score: player.score
       });
     }
+
+    // Yanlış cevap için son cevaplar listesine ekle
+    const recentAnswersWrong = addRecentAnswer(player, false, gameState.questionIndex, responseTime);
+    
+    // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder (yanlış cevap)
+    broadcast(gameState.wss, {
+      type: MessageType.RECENT_ANSWERS,
+      answers: recentAnswersWrong
+    }, [], true);
+    
+    console.log(`Yanlış cevap için recent_answers güncellendi: ${recentAnswersWrong.length} cevap`);
   } else {
     // Doğru cevap verdiğini kaydet
     gameState.roundCorrectAnswers.set(roundKey, true);
@@ -487,16 +499,18 @@ function handleAnswer(player, answer) {
       score: baseScore,
       totalScore: playerScoreData.totalScore
     });
-  }
 
-  // Son cevaplar listesine ekle - response time değeri ile
-  const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex, responseTime);
-  
-  // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder
-  broadcast(gameState.wss, {
-    type: MessageType.RECENT_ANSWERS,
-    answers: recentAnswers
-  }, [], true);
+    // Doğru cevap için son cevaplar listesine ekle
+    const recentAnswersCorrect = addRecentAnswer(player, true, gameState.questionIndex, responseTime);
+    
+    // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder (doğru cevap)
+    broadcast(gameState.wss, {
+      type: MessageType.RECENT_ANSWERS,
+      answers: recentAnswersCorrect
+    }, [], true);
+    
+    console.log(`Doğru cevap için recent_answers güncellendi: ${recentAnswersCorrect.length} cevap`);
+  }
 
   // Cevap logu
   const answerLog = composeGameEventLog('player_answer', {
@@ -506,7 +520,8 @@ function handleAnswer(player, answer) {
     isCorrect,
     remainingLives: player.lives,
     score: player.score,
-    responseTime // Loglara da ekle
+    responseTime, // Loglara da ekle
+    answerTimeDescription: `${Math.floor(responseTime / 1000)} saniyede cevaplandı` // Açıklayıcı bilgi
   });
   console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
 
@@ -521,7 +536,8 @@ function handleAnswer(player, answer) {
     responseTime: responseTime, // Milisaniye cinsinden
     responseTimeSeconds: Math.floor(responseTime / 1000), // Saniye cinsinden
     attemptCount: gameState.playerAttempts.get(roundKey) || 1,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    answerTimeDescription: `${Math.floor(responseTime / 1000)} saniyede cevaplandı` // Açıklayıcı bilgi
   });
 }
 

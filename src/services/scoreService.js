@@ -229,37 +229,52 @@ function calculateAverageResponseTime(answerResults) {
  * @param {number} responseTime Round başlangıcından itibaren geçen süre (ms)
  */
 function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) {
-  // Eğer responseTime belirtilmemişse hesapla
-  const roundKey = `${questionIndex}_${player.id}`;
-  const actualResponseTime = responseTime !== null ? responseTime : 
-    (gameState.playerTimes.get(roundKey) || 0);
-  
-  // Yeni cevap bilgisi - totalScore için doğrudan player.score kullan (anlık güncel skor)
-  const recentAnswer = {
-    playerId: player.id,
-    playerName: player.name,
-    isCorrect,
-    questionIndex,
-    totalScore: player.score, // Doğrudan güncel skoru kullan
-    responseTime: actualResponseTime, // Round başlangıcından itibaren geçen süre (ms)
-    responseTimeSeconds: Math.floor(actualResponseTime / 1000), // Saniye cinsinden
-    timestamp: Date.now() // Bu da Unix timestamp olarak kalabilir, karşılaştırma için
-  };
-  
-  // Eğer liste henüz oluşturulmamışsa oluştur
-  if (!gameState.recentAnswers) {
-    gameState.recentAnswers = [];
+  if (!player) {
+    console.error('addRecentAnswer: Oyuncu bilgisi bulunamadı');
+    return gameState.recentAnswers || [];
   }
-  
-  // Son cevaplar listesinin başına ekle (en yeni en üstte)
-  gameState.recentAnswers.unshift(recentAnswer);
-  
-  // Maksimum 50 cevap tutulacak (tek bir soru için)
-  if (gameState.recentAnswers.length > 50) {
-    gameState.recentAnswers = gameState.recentAnswers.slice(0, 50); // Sadece ilk 50 cevabı tut
+
+  try {
+    // Eğer responseTime belirtilmemişse hesapla
+    const roundKey = `${questionIndex}_${player.id}`;
+    const actualResponseTime = responseTime !== null ? responseTime : 
+      (gameState.playerTimes.get(roundKey) || 0);
+    
+    // Yeni cevap bilgisi - totalScore için doğrudan player.score kullan (anlık güncel skor)
+    const recentAnswer = {
+      playerId: player.id,
+      playerName: player.name,
+      isCorrect,
+      questionIndex,
+      totalScore: player.score, // Doğrudan güncel skoru kullan
+      responseTime: actualResponseTime, // Round başlangıcından itibaren geçen süre (ms)
+      responseTimeSeconds: Math.floor(actualResponseTime / 1000), // Saniye cinsinden
+      answerTimeDescription: `${Math.floor(actualResponseTime / 1000)} saniyede cevaplandı`, // Açıklayıcı bilgi
+      timestamp: Date.now() // Bu da Unix timestamp olarak kalabilir, karşılaştırma için
+    };
+    
+    // Eğer liste henüz oluşturulmamışsa oluştur
+    if (!gameState.recentAnswers) {
+      gameState.recentAnswers = [];
+      console.log('addRecentAnswer: recentAnswers listesi oluşturuldu');
+    }
+    
+    // Son cevaplar listesinin başına ekle (en yeni en üstte)
+    gameState.recentAnswers.unshift(recentAnswer);
+    
+    // Maksimum 50 cevap tutulacak (tek bir soru için)
+    if (gameState.recentAnswers.length > 50) {
+      gameState.recentAnswers = gameState.recentAnswers.slice(0, 50); // Sadece ilk 50 cevabı tut
+    }
+    
+    // Debug log - doğru cevaplarda sorun olabilir
+    console.log(`Recent Answer added: ${player.name}, isCorrect: ${isCorrect}, totalScore: ${player.score}, recentAnswers.length: ${gameState.recentAnswers.length}`);
+    
+    return gameState.recentAnswers;
+  } catch (error) {
+    console.error('addRecentAnswer hata:', error.message);
+    return gameState.recentAnswers || [];
   }
-  
-  return gameState.recentAnswers;
 }
 
 /**
