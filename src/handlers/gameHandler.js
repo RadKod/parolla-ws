@@ -1,7 +1,7 @@
 const MessageType = require('../constants/messageTypes');
 const { broadcast, sendToPlayer, broadcastToViewers } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
-const { MAX_LIVES, CORRECT_ANSWER_SCORE, NEXT_QUESTION_DELAY } = require('../config/game.config');
+const { MAX_LIVES, CORRECT_ANSWER_SCORE, NEXT_QUESTION_DELAY, BASE_SCORES } = require('../config/game.config');
 const { getUnlimitedQuestions } = require('../services/questionService');
 const { isAnswerCorrect } = require('../utils/stringUtils');
 const gameState = require('../state/gameState');
