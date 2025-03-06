@@ -262,6 +262,48 @@ function checkTurkishSuffixes(answer, correctAnswer) {
 }
 
 /**
+ * Kısa cevabın uzun cevapta içerilip içerilmediğini kontrol eder
+ * @param {string} shortAnswer Kullanıcı cevabı (kısa)
+ * @param {string} longAnswer Doğru cevap (uzun)
+ * @returns {boolean} Kısa cevap uzun cevabın parçası mı
+ */
+function isPartialMatch(shortAnswer, longAnswer) {
+  // Eğer kısa cevap uzun cevapta kelime başlangıcı olarak içeriliyorsa
+  if (longAnswer.startsWith(shortAnswer)) {
+    // Kelime sınırı kontrolü yap (kelime başlangıcı olmalı)
+    const nextChar = longAnswer[shortAnswer.length];
+    // Eğer sonraki karakter yoksa veya boşluksa, kelime sınırı var demektir
+    if (!nextChar || nextChar === ' ') {
+      return true;
+    }
+  }
+  
+  // Uzun cevabı kelimelere ayır
+  const longWords = longAnswer.split(/\s+/);
+  
+  // Kısa cevabı kelimelere ayır (birden fazla kelime olabilir)
+  const shortWords = shortAnswer.split(/\s+/);
+  
+  // Eğer kısa cevap tek kelimeyse ve uzun cevabın bir kelimesiyle tam eşleşiyorsa
+  if (shortWords.length === 1) {
+    return longWords.includes(shortWords[0]);
+  }
+  
+  // Eğer kısa cevap birden fazla kelimeyse, uzun cevabın başındaki veya sonundaki kelimelerle eşleşiyor mu kontrol et
+  // Baştan kontrol
+  const startMatches = shortWords.every((word, index) => index < longWords.length && word === longWords[index]);
+  if (startMatches) return true;
+  
+  // Sondan kontrol
+  const endMatches = shortWords.every((word, index) => {
+    const longIndex = longWords.length - shortWords.length + index;
+    return longIndex >= 0 && word === longWords[longIndex];
+  });
+  
+  return endMatches;
+}
+
+/**
  * Cevabın doğruluğunu kontrol eder
  * @param {string} answer Kullanıcı cevabı
  * @param {string} correctAnswer Doğru cevap
@@ -276,6 +318,16 @@ function isAnswerCorrect(answer, correctAnswer) {
   
   // Sesli-sessiz harf değişimi varsa
   if (checkTurkishPhonetics(answer, correctAnswer)) return true;
+  
+  // Eğer kullanıcı cevabı doğru cevabın bir parçasıysa (kısa cevap uzun cevap içinde)
+  if (answer.length < correctAnswer.length && isPartialMatch(answer, correctAnswer)) {
+    return true;
+  }
+  
+  // Eğer doğru cevap kullanıcı cevabının bir parçasıysa (uzun cevap kısa cevap içinde)
+  if (correctAnswer.length < answer.length && isPartialMatch(correctAnswer, answer)) {
+    return true;
+  }
 
   // Benzerlik oranı çok yüksekse (0.9 = %90 benzerlik)
   const similarity = calculateSimilarity(answer, correctAnswer);
@@ -284,5 +336,6 @@ function isAnswerCorrect(answer, correctAnswer) {
 
 module.exports = {
   isAnswerCorrect,
-  checkTurkishPhonetics
+  checkTurkishPhonetics,
+  isPartialMatch
 }; 

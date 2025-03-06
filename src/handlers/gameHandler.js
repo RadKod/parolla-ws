@@ -292,18 +292,22 @@ function handleTimeUp() {
   }
 
   // Tur puanlarını gönder
+  const roundScoresMessage = {
+    type: MessageType.ROUND_SCORES,
+    scores: roundScores,
+    questionIndex: gameState.questionIndex,
+    isEmpty: roundScores.length === 0 // Boş olup olmadığını belirt
+  };
+  
   if (roundScores.length > 0) {
-    const roundScoresMessage = {
-      type: MessageType.ROUND_SCORES,
-      scores: roundScores,
-      questionIndex: gameState.questionIndex
-    };
-    
     console.log(`Tur puanları gönderiliyor: ${roundScores.length} oyuncu`);
-    
-    // Tüm oyunculara ve izleyicilere tur puanlarını gönder
-    broadcast(gameState.wss, roundScoresMessage, [], true);
+  } else {
+    console.log('Bu turda doğru cevap veren olmadı, boş puan tablosu gönderiliyor');
   }
+  
+  // Her durumda puan tablosu gönder (boş bile olsa)
+  // Böylece client eski puanları göstermez
+  broadcast(gameState.wss, roundScoresMessage, [], true);
 
   // Bekleme süresini başlat
   gameState.waitingStartTime = Date.now();
@@ -423,7 +427,9 @@ function handleAnswer(player, answer) {
   // Her bir alternatif cevap için kontrol et
   const isCorrect = correctAnswers.some(correctAns => 
     isAnswerCorrect(cleanAnswer, correctAns)
-  );
+  ) || 
+  // Ayrıca, kısa bir cevap yazıldığında, uzun cevaplarla da karşılaştır
+  (cleanAnswer.length < 15 && correctAnswers.join(' ').includes(cleanAnswer));
 
   // Round başlangıcından itibaren geçen süreyi hesapla
   const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
