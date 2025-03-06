@@ -84,8 +84,17 @@ function calculateRoundScores(roundIndex) {
       answerResults: [] // cevap sonuçları listesi
     };
     
+    // Eski skor bilgisini kaydet
+    const oldScore = player.score;
+    
+    // Tur için yeni puanı ekle
     playerScoreData.rounds[roundIndex] = scoreInfo;
+    
+    // Toplam puana tur puanını ekle
     playerScoreData.totalScore += scoreInfo.totalScore;
+    
+    // Oyuncunun gerçek skorunu güncelle - ÖNEMLİ!
+    player.score = playerScoreData.totalScore;
     
     // Eğer answerResults dizisi yoksa oluştur
     if (!playerScoreData.answerResults) {
@@ -104,11 +113,18 @@ function calculateRoundScores(roundIndex) {
     if (!lastAnswerResult) {
       playerScoreData.answerResults.push({
         questionIndex: roundIndex,
-        score: player.score,
+        score: player.score, // Güncellenmiş skoru kullan
+        oldScore: oldScore, // Eski skoru da kaydedelim (istatistik için)
+        earnedPoints: scoreInfo.totalScore, // Bu turda kazanılan puanlar
         responseTime: responseTime,
         responseTimeSeconds: Math.floor(responseTime / 1000), // Saniye cinsinden
         timestamp: answerTimestamp
       });
+    } else {
+      // Varolan kaydı güncelle
+      lastAnswerResult.score = player.score;
+      lastAnswerResult.oldScore = oldScore;
+      lastAnswerResult.earnedPoints = scoreInfo.totalScore;
     }
     
     gameState.playerScores.set(playerId, playerScoreData);
@@ -122,8 +138,10 @@ function calculateRoundScores(roundIndex) {
       responseTimeSeconds: Math.floor(responseTime / 1000), // Saniye cinsinden
       timestamp: answerTimestamp,    // Zaman damgası
       attemptCount,                  // Deneme sayısı
-      totalPlayerScore: playerScoreData.totalScore,
-      currentScore: player.score // mevcut ANSWER_RESULT skoru
+      oldScore: oldScore,            // Eski skor
+      newScore: player.score,        // Yeni skor  
+      earnedPoints: scoreInfo.totalScore, // Bu turda kazanılan puanlar
+      totalPlayerScore: playerScoreData.totalScore // Toplam puanı (aynı değer, newScore ile)
     });
   }
   

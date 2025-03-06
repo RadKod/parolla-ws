@@ -444,7 +444,8 @@ function handleAnswer(player, answer) {
       });
     }
   } else {
-    player.score += CORRECT_ANSWER_SCORE;
+    // Eski puan ekleme sistemini kaldırıyoruz
+    // player.score += CORRECT_ANSWER_SCORE;
     
     // Doğru cevap verdiğini kaydet
     gameState.roundCorrectAnswers.set(roundKey, true);
@@ -465,7 +466,8 @@ function handleAnswer(player, answer) {
     // Cevap sonucunu kaydet
     playerScoreData.answerResults.push({
       questionIndex: gameState.questionIndex,
-      score: player.score,
+      // Gerçek skor değil, sadece doğru cevap verdiğini göstermek için
+      score: -1, // Gerçek skor tur sonunda hesaplanacak
       responseTime: responseTime,
       timestamp: Date.now()
     });
@@ -499,7 +501,7 @@ function handleAnswer(player, answer) {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
     lives: player.lives,
-    score: player.score,
+    score: player.score, // Şimdilik eski skoru gönderilebilir, tur sonunda güncellenecek
     // Ek bilgiler
     questionIndex: gameState.questionIndex,
     responseTime: responseTime, // Milisaniye cinsinden
