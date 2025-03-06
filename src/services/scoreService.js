@@ -25,7 +25,7 @@ function calculatePlayerScore(playerId, responseTime, attemptCount, roundIndex) 
     return {
       baseScore: 0,
       timeBonus: 0, 
-      attemptPenalty: 0,  // Ceza yok
+      attemptPenalty: 0,
       totalScore: 0,
       rank: playerRank !== -1 ? playerRank + 1 : -1
     };
@@ -39,13 +39,11 @@ function calculatePlayerScore(playerId, responseTime, attemptCount, roundIndex) 
   const timeRatio = (ROUND_TIME - responseTime) / ROUND_TIME;
   const timeBonus = Math.round(baseScore * TIME_BONUS_FACTOR * timeRatio);
   
-  // Deneme sayısı bilgisini kaydet, ancak ceza uygulamıyoruz
-  const usedAttempts = Math.max(0, attemptCount - 1); // İlk hak bedava
-  // const attemptPenalty = Math.round(baseScore * ATTEMPT_PENALTY_FACTOR * usedAttempts);
-  const attemptPenalty = 0; // Ceza yok
+  // YENİ: Hak cezası artık uygulanmıyor (kullanıcı bilemediğinde puanı düşmeyecek)
+  const attemptPenalty = 0;
   
-  // Toplam puanı hesapla (ceza olmadan)
-  const totalScore = Math.max(0, baseScore + timeBonus);
+  // Toplam puanı hesapla
+  const totalScore = Math.max(0, baseScore + timeBonus - attemptPenalty);
   
   // Puan nesnesini döndür
   return {
@@ -53,8 +51,7 @@ function calculatePlayerScore(playerId, responseTime, attemptCount, roundIndex) 
     timeBonus,
     attemptPenalty,
     totalScore,
-    rank: playerRank + 1,
-    attemptCount // Deneme sayısını da kaydedelim (istatistik için)
+    rank: playerRank + 1
   };
 }
 
@@ -215,9 +212,9 @@ function calculateAverageResponseTime(answerResults) {
 }
 
 /**
- * Son cevap listesine yeni cevap ekler
- * @param {Object} player Oyuncu bilgisi
- * @param {boolean} isCorrect Cevabın doğru olup olmadığı
+ * Son cevaplar listesine yeni bir cevap ekler
+ * @param {Player} player Oyuncu
+ * @param {boolean} isCorrect Cevap doğru mu
  * @param {number} questionIndex Soru indeksi
  * @param {number} responseTime Round başlangıcından itibaren geçen süre (ms)
  */
@@ -227,46 +224,16 @@ function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) 
   const actualResponseTime = responseTime !== null ? responseTime : 
     (gameState.playerTimes.get(roundKey) || 0);
   
-  // Oyuncunun en güncel skor verisini al
-  const playerScoreData = gameState.playerScores.get(player.id);
-  
-  // Eğer doğru cevap verdiyse, tahmini puanı hesapla
-  let estimatedScore = 0;
-  if (isCorrect) {
-    // Şu anki sıralamayı bul (o ana kadar doğru cevap verenler arasında)
-    const currentRank = gameState.correctAnswerPlayers.findIndex(pid => pid === player.id);
-    
-    // Eğer sıralama içindeyse ve puan alabilecek sıradaysa
-    if (currentRank !== -1 && currentRank < MAX_SCORE_PLAYERS) {
-      // Baz puanı hesapla
-      estimatedScore = BASE_SCORES[currentRank] || 0;
-      
-      // Zaman bonusunu hesapla
-      const timeRatio = (ROUND_TIME - actualResponseTime) / ROUND_TIME;
-      const timeBonus = Math.round(estimatedScore * TIME_BONUS_FACTOR * timeRatio);
-      
-      // Toplam tahmini puanı hesapla (deneme cezası olmadan)
-      estimatedScore += timeBonus;
-    }
-  }
-  
-  // Mevcut toplam puan + tahmini yeni puan
-  const playerTotalScore = (playerScoreData ? playerScoreData.totalScore : 0);
-  const currentWithEstimated = playerTotalScore + (isCorrect ? estimatedScore : 0);
-  
-  // Yeni cevap bilgisi
+  // Yeni cevap bilgisi - totalScore için doğrudan player.score kullan (anlık güncel skor)
   const recentAnswer = {
     playerId: player.id,
     playerName: player.name,
     isCorrect,
     questionIndex,
-    currentTotalScore: playerTotalScore, // Mevcut toplam puan
-    estimatedScore: isCorrect ? estimatedScore : 0, // Tahmini yeni puan
-    estimatedTotalScore: currentWithEstimated, // Tahmini toplam puan
+    totalScore: player.score, // Doğrudan güncel skoru kullan
     responseTime: actualResponseTime, // Round başlangıcından itibaren geçen süre (ms)
     responseTimeSeconds: Math.floor(actualResponseTime / 1000), // Saniye cinsinden
-    timestamp: Date.now(), // Bu da Unix timestamp olarak kalabilir, karşılaştırma için
-    attemptCount: gameState.playerAttempts.get(roundKey) || 1 // Deneme sayısı
+    timestamp: Date.now() // Bu da Unix timestamp olarak kalabilir, karşılaştırma için
   };
   
   // Eğer liste henüz oluşturulmamışsa oluştur

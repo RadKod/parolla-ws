@@ -291,22 +291,16 @@ function handleTimeUp() {
     broadcastToViewers(gameState.wss, timeUpMessage);
   }
 
-  // Tur puanlarını gönder
+  // Tur puanlarını gönder - Her durumda gönder (kimse doğru bilmediğinde boş liste olacak)
   const roundScoresMessage = {
     type: MessageType.ROUND_SCORES,
     scores: roundScores,
-    questionIndex: gameState.questionIndex,
-    isEmpty: roundScores.length === 0 // Boş olup olmadığını belirt
+    questionIndex: gameState.questionIndex
   };
   
-  if (roundScores.length > 0) {
-    console.log(`Tur puanları gönderiliyor: ${roundScores.length} oyuncu`);
-  } else {
-    console.log('Bu turda doğru cevap veren olmadı, boş puan tablosu gönderiliyor');
-  }
+  console.log(`Tur puanları gönderiliyor: ${roundScores.length} oyuncu`);
   
-  // Her durumda puan tablosu gönder (boş bile olsa)
-  // Böylece client eski puanları göstermez
+  // Tüm oyunculara ve izleyicilere tur puanlarını gönder
   broadcast(gameState.wss, roundScoresMessage, [], true);
 
   // Bekleme süresini başlat
@@ -424,12 +418,10 @@ function handleAnswer(player, answer) {
     .split(',')
     .map(ans => ans.trim());
 
-  // Her bir alternatif cevap için kontrol et
+  // Her bir alternatif cevap için kontrol et - SADECE isAnswerCorrect kullan
   const isCorrect = correctAnswers.some(correctAns => 
     isAnswerCorrect(cleanAnswer, correctAns)
-  ) || 
-  // Ayrıca, kısa bir cevap yazıldığında, uzun cevaplarla da karşılaştır
-  (cleanAnswer.length < 15 && correctAnswers.join(' ').includes(cleanAnswer));
+  );
 
   // Round başlangıcından itibaren geçen süreyi hesapla
   const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
@@ -450,9 +442,6 @@ function handleAnswer(player, answer) {
       });
     }
   } else {
-    // Eski puan ekleme sistemini kaldırıyoruz
-    // player.score += CORRECT_ANSWER_SCORE;
-    
     // Doğru cevap verdiğini kaydet
     gameState.roundCorrectAnswers.set(roundKey, true);
     
@@ -473,12 +462,16 @@ function handleAnswer(player, answer) {
     playerScoreData.answerResults.push({
       questionIndex: gameState.questionIndex,
       // Gerçek skor değil, sadece doğru cevap verdiğini göstermek için
-      score: -1, // Gerçek skor tur sonunda hesaplanacak
+      score: playerScoreData.totalScore, // Anlık toplam skoru ekliyoruz
       responseTime: responseTime,
       timestamp: Date.now()
     });
     
     gameState.playerScores.set(player.id, playerScoreData);
+    
+    // Oyuncunun score değerini playerScoreData.totalScore değerine eşitle 
+    // Not: Gerçek puan hesaplanması tur sonunda yapılacak fakat UI'da güncel skoru göstermek için
+    player.score = playerScoreData.totalScore;
   }
 
   // Son cevaplar listesine ekle - response time değeri ile
@@ -507,7 +500,7 @@ function handleAnswer(player, answer) {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
     lives: player.lives,
-    score: player.score, // Şimdilik eski skoru gönderilebilir, tur sonunda güncellenecek
+    score: player.score, // Anlık skoru gönderiyoruz
     // Ek bilgiler
     questionIndex: gameState.questionIndex,
     responseTime: responseTime, // Milisaniye cinsinden

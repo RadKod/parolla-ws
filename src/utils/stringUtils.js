@@ -262,15 +262,52 @@ function checkTurkishSuffixes(answer, correctAnswer) {
 }
 
 /**
+ * Turkish to english char converter
+ * @param {string} value
+ * @returns English variant of turkish characters
+ */
+const encodeEnglish = value => {
+  return value
+    .replace(/ /g, '-')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/Ş/g, 's')
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'i')
+    .replace(/Ç/g, 'c')
+    .replace(/Ğ/g, 'g')
+    .replace(/Ö/g, 'o')
+    .replace(/Ü/g, 'u')
+    .replace(/-{2,}/g, '-')
+};
+
+/**
  * Kısa cevabın uzun cevapta içerilip içerilmediğini kontrol eder
  * @param {string} shortAnswer Kullanıcı cevabı (kısa)
  * @param {string} longAnswer Doğru cevap (uzun)
  * @returns {boolean} Kısa cevap uzun cevabın parçası mı
  */
 function isPartialMatch(shortAnswer, longAnswer) {
+  // Eğer kısa cevap çok kısaysa (minimum 3 karakter olmalı)
+  if (shortAnswer.length < 3) {
+    // Ancak tam eşleşme varsa kabul et (örneğin cevap "pas" ise)
+    return shortAnswer === longAnswer;
+  }
+  
+  // Uzun cevabı kelimelere ayır
+  const longWords = longAnswer.split(/\s+/);
+  
+  // Kısa cevabı kelimelere ayır
+  const shortWords = shortAnswer.split(/\s+/);
+  
   // Eğer kısa cevap uzun cevapta kelime başlangıcı olarak içeriliyorsa
+  // Ancak tam bir kelime olarak eşleşmeli
   if (longAnswer.startsWith(shortAnswer)) {
-    // Kelime sınırı kontrolü yap (kelime başlangıcı olmalı)
+    // Kelime sınırı kontrolü (tam bir kelime olmalı veya kelimenin başlangıcı olmalı)
     const nextChar = longAnswer[shortAnswer.length];
     // Eğer sonraki karakter yoksa veya boşluksa, kelime sınırı var demektir
     if (!nextChar || nextChar === ' ') {
@@ -278,20 +315,19 @@ function isPartialMatch(shortAnswer, longAnswer) {
     }
   }
   
-  // Uzun cevabı kelimelere ayır
-  const longWords = longAnswer.split(/\s+/);
-  
-  // Kısa cevabı kelimelere ayır (birden fazla kelime olabilir)
-  const shortWords = shortAnswer.split(/\s+/);
-  
   // Eğer kısa cevap tek kelimeyse ve uzun cevabın bir kelimesiyle tam eşleşiyorsa
   if (shortWords.length === 1) {
-    return longWords.includes(shortWords[0]);
+    // Uzun cevabın içinde tam kelime olarak bulunmalı (sadece parça değil)
+    return longWords.some(word => word === shortWords[0]);
   }
   
-  // Eğer kısa cevap birden fazla kelimeyse, uzun cevabın başındaki veya sonundaki kelimelerle eşleşiyor mu kontrol et
+  // Eğer kısa cevap birden fazla kelimeyse,
+  // uzun cevabın başındaki veya sonundaki kelimelerle eşleşiyor mu kontrol et
+  
   // Baştan kontrol
-  const startMatches = shortWords.every((word, index) => index < longWords.length && word === longWords[index]);
+  const startMatches = shortWords.every((word, index) => 
+    index < longWords.length && word === longWords[index]);
+  
   if (startMatches) return true;
   
   // Sondan kontrol
@@ -310,32 +346,40 @@ function isPartialMatch(shortAnswer, longAnswer) {
  * @returns {boolean} Cevap doğru mu
  */
 function isAnswerCorrect(answer, correctAnswer) {
-  // Tam eşleşme varsa
-  if (answer === correctAnswer) return true;
-
-  // Çekim eki farkı varsa
-  if (checkTurkishSuffixes(answer, correctAnswer)) return true;
+  // Türkçe karakterleri İngilizce karşılıklarına dönüştür
+  const normalizedAnswer = encodeEnglish(answer);
+  const normalizedCorrectAnswer = encodeEnglish(correctAnswer);
   
-  // Sesli-sessiz harf değişimi varsa
-  if (checkTurkishPhonetics(answer, correctAnswer)) return true;
+  // Tam eşleşme varsa
+  if (answer === correctAnswer || normalizedAnswer === normalizedCorrectAnswer) return true;
+
+  // Çekim eki farkı varsa - normalleştirilmiş cevaplar üzerinde kontrol et
+  if (checkTurkishSuffixes(normalizedAnswer, normalizedCorrectAnswer)) return true;
+  
+  // Sesli-sessiz harf değişimi varsa - normalleştirilmiş cevaplar üzerinde kontrol et
+  if (checkTurkishPhonetics(normalizedAnswer, normalizedCorrectAnswer)) return true;
   
   // Eğer kullanıcı cevabı doğru cevabın bir parçasıysa (kısa cevap uzun cevap içinde)
-  if (answer.length < correctAnswer.length && isPartialMatch(answer, correctAnswer)) {
+  // Normalleştirilmiş cevaplar üzerinde kontrol et
+  if (normalizedAnswer.length < normalizedCorrectAnswer.length && isPartialMatch(normalizedAnswer, normalizedCorrectAnswer)) {
     return true;
   }
   
   // Eğer doğru cevap kullanıcı cevabının bir parçasıysa (uzun cevap kısa cevap içinde)
-  if (correctAnswer.length < answer.length && isPartialMatch(correctAnswer, answer)) {
+  // Normalleştirilmiş cevaplar üzerinde kontrol et
+  if (normalizedCorrectAnswer.length < normalizedAnswer.length && isPartialMatch(normalizedCorrectAnswer, normalizedAnswer)) {
     return true;
   }
 
   // Benzerlik oranı çok yüksekse (0.9 = %90 benzerlik)
-  const similarity = calculateSimilarity(answer, correctAnswer);
+  // Normalleştirilmiş cevaplar üzerinde benzerlik kontrol et
+  const similarity = calculateSimilarity(normalizedAnswer, normalizedCorrectAnswer);
   return similarity > 0.9;
 }
 
 module.exports = {
   isAnswerCorrect,
   checkTurkishPhonetics,
-  isPartialMatch
+  isPartialMatch,
+  encodeEnglish
 }; 
