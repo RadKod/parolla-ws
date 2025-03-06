@@ -380,7 +380,7 @@ function handleTimeUp() {
  * @param {string} answer Cevap
  */
 function handleAnswer(player, answer) {
-  console.log(`Cevap alındı: ${player.name}, cevap: ${answer}`);
+  console.log(`HandleAnswer başladı: ${player.name}, cevap: ${answer}`);
   
   // Sadece mevcut soru varsa ve süre devam ediyorsa
   if (!gameState.currentQuestion) {
@@ -434,13 +434,13 @@ function handleAnswer(player, answer) {
     isAnswerCorrect(cleanAnswer, correctAns)
   );
   
-  console.log(`Cevap kontrolü: ${cleanAnswer}, doğru mu: ${isCorrect}`);
+  console.log(`Cevap doğruluk kontrolü: ${cleanAnswer}, isCorrect=${isCorrect}`);
 
   // Round başlangıcından itibaren geçen süreyi hesapla
   const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
 
+  // YANLIŞ CEVAP İŞLEMİ
   if (!isCorrect) {
-    // YANLIŞ CEVAP İŞLEMİ
     player.lives--;
     console.log(`${player.name} yanlış cevap verdi, kalan can: ${player.lives}`);
     
@@ -456,8 +456,9 @@ function handleAnswer(player, answer) {
         score: player.score
       });
     }
-  } else {
-    // DOĞRU CEVAP İŞLEMİ
+  } 
+  // DOĞRU CEVAP İŞLEMİ
+  else {
     console.log(`${player.name} doğru cevap verdi!`);
     
     // Doğru cevap verdiğini kaydet
@@ -509,18 +510,37 @@ function handleAnswer(player, answer) {
     console.log(`${player.name} puanı güncellendi: ${player.score}`);
   }
 
-  // ÇOK ÖNEMLİ: Recent Answers'ı güncelle ve gönder
-  console.log(`Recent Answers güncelleniyor...`);
+  // ******* KRİTİK BÖLGE *******
+  // Bu kısım kesinlikle çalışmalı ve isCorrect değerine göre farklı işlem yapmamalı
+
+  // Son cevaplar listesini güncelle
+  console.log(`Recent Answers güncelleniyor... isCorrect=${isCorrect}`);
   const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex, responseTime);
   
-  // Recent Answers'ı tüm oyunculara ve izleyicilere gönder
+  // Recent Answers mesajını broadcast et - HER DURUMDA
   broadcast(gameState.wss, {
     type: MessageType.RECENT_ANSWERS,
     answers: recentAnswers
   }, [], true);
   
-  console.log(`Recent Answers gönderildi, toplam ${recentAnswers.length} cevap.`);
+  console.log(`Recent Answers broadcast edildi, toplam ${recentAnswers.length} cevap`);
 
+  // Cevap sonucunu oyuncuya gönder - HER DURUMDA  
+  sendToPlayer(player.ws, {
+    type: MessageType.ANSWER_RESULT,
+    correct: isCorrect,
+    lives: player.lives,
+    score: player.score,
+    questionIndex: gameState.questionIndex,
+    responseTime: responseTime,
+    responseTimeSeconds: Math.floor(responseTime / 1000),
+    attemptCount: currentAttempts,
+    timestamp: Date.now(),
+    answerTimeDescription: `${Math.floor(responseTime / 1000)} saniyede cevaplandı`
+  });
+  
+  console.log(`Answer Result gönderildi: doğru=${isCorrect}, can=${player.lives}, puan=${player.score}`);
+  
   // Cevap logu
   const answerLog = composeGameEventLog('player_answer', {
     playerId: player.id,
@@ -532,23 +552,6 @@ function handleAnswer(player, answer) {
     responseTime
   });
   console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
-
-  // ÇOK ÖNEMLİ: Answer Result gönder
-  console.log(`${player.name} için Answer Result gönderiliyor...`);
-  sendToPlayer(player.ws, {
-    type: MessageType.ANSWER_RESULT,
-    correct: isCorrect,
-    lives: player.lives,
-    score: player.score,
-    questionIndex: gameState.questionIndex,
-    responseTime: responseTime,
-    responseTimeSeconds: Math.floor(responseTime / 1000),
-    attemptCount: gameState.playerAttempts.get(roundKey) || 1,
-    timestamp: Date.now(),
-    answerTimeDescription: `${Math.floor(responseTime / 1000)} saniyede cevaplandı`
-  });
-  
-  console.log(`Answer Result gönderildi: doğru=${isCorrect}, can=${player.lives}, puan=${player.score}`);
 }
 
 /**

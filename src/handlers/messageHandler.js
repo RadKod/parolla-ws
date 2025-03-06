@@ -52,43 +52,10 @@ function handleMessage(ws, message, playerId) {
         return;
       }
       
-      console.log(`MessageHandler: ${player.name} cevap gönderdi: ${data.answer}`);
+      console.log(`MessageHandler: ${player.name}, cevap verdi: "${data.answer}"`);
       
-      // Cevabı işle
+      // Cevabı işle - handleAnswer içinde tüm mesajlar gönderiliyor
       handleAnswer(player, data.answer);
-      
-      // Tüm gerekli verileri manuel olarak hazırla
-      const roundKey = `${gameState.questionIndex}_${player.id}`;
-      const isCorrect = gameState.roundCorrectAnswers.get(roundKey) || false;
-      const responseTime = gameState.playerTimes.get(roundKey) || 0;
-      const attemptCount = gameState.playerAttempts.get(roundKey) || 1;
-      
-      // Son cevaplar listesini güncelle ve al
-      const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex, responseTime);
-      
-      // Son cevaplar listesini tüm oyunculara gönder
-      broadcast(gameState.wss, {
-        type: MessageType.RECENT_ANSWERS,
-        answers: recentAnswers
-      }, [], true);
-      
-      console.log(`MessageHandler: Recent Answers gönderildi (${recentAnswers.length} cevap)`);
-      
-      // Cevap sonucunu oyuncuya bildir
-      sendToPlayer(ws, {
-        type: MessageType.ANSWER_RESULT,
-        correct: isCorrect,
-        lives: player.lives,
-        score: player.score,
-        questionIndex: gameState.questionIndex,
-        responseTime: responseTime,
-        responseTimeSeconds: Math.floor(responseTime / 1000),
-        attemptCount: attemptCount,
-        timestamp: Date.now(),
-        answerTimeDescription: `${Math.floor(responseTime / 1000)} saniyede cevaplandı`
-      });
-      
-      console.log(`MessageHandler: Answer Result gönderildi -> correct: ${isCorrect}, lives: ${player.lives}, score: ${player.score}`);
       break;
 
     case MessageType.CHAT_MESSAGE:
