@@ -106,6 +106,7 @@ function calculateRoundScores(roundIndex) {
         questionIndex: roundIndex,
         score: player.score,
         responseTime: responseTime,
+        responseTimeSeconds: Math.floor(responseTime / 1000), // Saniye cinsinden
         timestamp: answerTimestamp
       });
     }
@@ -118,6 +119,7 @@ function calculateRoundScores(roundIndex) {
       playerName: player.name,
       ...scoreInfo,
       responseTime,                  // Cevap süresi (ms)
+      responseTimeSeconds: Math.floor(responseTime / 1000), // Saniye cinsinden
       timestamp: answerTimestamp,    // Zaman damgası
       attemptCount,                  // Deneme sayısı
       totalPlayerScore: playerScoreData.totalScore,
@@ -197,8 +199,14 @@ function calculateAverageResponseTime(answerResults) {
  * @param {Object} player Oyuncu bilgisi
  * @param {boolean} isCorrect Cevabın doğru olup olmadığı
  * @param {number} questionIndex Soru indeksi
+ * @param {number} responseTime Round başlangıcından itibaren geçen süre (ms)
  */
-function addRecentAnswer(player, isCorrect, questionIndex) {
+function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) {
+  // Eğer responseTime belirtilmemişse hesapla
+  const roundKey = `${questionIndex}_${player.id}`;
+  const actualResponseTime = responseTime !== null ? responseTime : 
+    (gameState.playerTimes.get(roundKey) || 0);
+  
   // Yeni cevap bilgisi
   const recentAnswer = {
     playerId: player.id,
@@ -206,7 +214,9 @@ function addRecentAnswer(player, isCorrect, questionIndex) {
     isCorrect,
     questionIndex,
     totalScore: player.score,
-    timestamp: Date.now()
+    responseTime: actualResponseTime, // Round başlangıcından itibaren geçen süre (ms)
+    responseTimeSeconds: Math.floor(actualResponseTime / 1000), // Saniye cinsinden
+    timestamp: Date.now() // Bu da Unix timestamp olarak kalabilir, karşılaştırma için
   };
   
   // Eğer liste henüz oluşturulmamışsa oluştur

@@ -425,6 +425,9 @@ function handleAnswer(player, answer) {
     isAnswerCorrect(cleanAnswer, correctAns)
   );
 
+  // Round başlangıcından itibaren geçen süreyi hesapla
+  const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
+
   if (!isCorrect) {
     player.lives--;
     
@@ -447,7 +450,6 @@ function handleAnswer(player, answer) {
     gameState.roundCorrectAnswers.set(roundKey, true);
     
     // Yanıt süresini hesapla ve kaydet
-    const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
     gameState.playerTimes.set(roundKey, responseTime);
     
     // Doğru cevap veren oyuncular listesine ekle (sıralama için)
@@ -471,8 +473,8 @@ function handleAnswer(player, answer) {
     gameState.playerScores.set(player.id, playerScoreData);
   }
 
-  // Son cevaplar listesine ekle
-  const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex);
+  // Son cevaplar listesine ekle - response time değeri ile
+  const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex, responseTime);
   
   // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder
   broadcast(gameState.wss, {
@@ -487,7 +489,8 @@ function handleAnswer(player, answer) {
     answer: cleanAnswer,
     isCorrect,
     remainingLives: player.lives,
-    score: player.score
+    score: player.score,
+    responseTime // Loglara da ekle
   });
   console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
 
@@ -499,7 +502,8 @@ function handleAnswer(player, answer) {
     score: player.score,
     // Ek bilgiler
     questionIndex: gameState.questionIndex,
-    responseTime: isCorrect ? (gameState.ROUND_TIME - timeInfo.remaining) : null,
+    responseTime: responseTime, // Milisaniye cinsinden
+    responseTimeSeconds: Math.floor(responseTime / 1000), // Saniye cinsinden
     attemptCount: gameState.playerAttempts.get(roundKey) || 1,
     timestamp: Date.now()
   });
