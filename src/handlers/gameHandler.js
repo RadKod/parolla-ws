@@ -427,6 +427,7 @@ function handleAnswer(player, answer) {
   // Round başlangıcından itibaren geçen süreyi hesapla
   const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
 
+  // Doğru veya yanlış cevap işlemlerini yap
   if (!isCorrect) {
     player.lives--;
     
@@ -442,17 +443,6 @@ function handleAnswer(player, answer) {
         score: player.score
       });
     }
-
-    // Yanlış cevap için son cevaplar listesine ekle
-    const recentAnswersWrong = addRecentAnswer(player, false, gameState.questionIndex, responseTime);
-    
-    // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder (yanlış cevap)
-    broadcast(gameState.wss, {
-      type: MessageType.RECENT_ANSWERS,
-      answers: recentAnswersWrong
-    }, [], true);
-    
-    console.log(`Yanlış cevap için recent_answers güncellendi: ${recentAnswersWrong.length} cevap`);
   } else {
     // Doğru cevap verdiğini kaydet
     gameState.roundCorrectAnswers.set(roundKey, true);
@@ -499,18 +489,19 @@ function handleAnswer(player, answer) {
       score: baseScore,
       totalScore: playerScoreData.totalScore
     });
-
-    // Doğru cevap için son cevaplar listesine ekle
-    const recentAnswersCorrect = addRecentAnswer(player, true, gameState.questionIndex, responseTime);
-    
-    // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder (doğru cevap)
-    broadcast(gameState.wss, {
-      type: MessageType.RECENT_ANSWERS,
-      answers: recentAnswersCorrect
-    }, [], true);
-    
-    console.log(`Doğru cevap için recent_answers güncellendi: ${recentAnswersCorrect.length} cevap`);
   }
+
+  // BURASI ÖNEMLİ: Cevap doğru veya yanlış olsun, her durumda recent_answers göndereceğiz
+  // Son cevaplar listesine ekle
+  const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex, responseTime);
+  
+  // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder
+  broadcast(gameState.wss, {
+    type: MessageType.RECENT_ANSWERS,
+    answers: recentAnswers
+  }, [], true);
+  
+  console.log(`${isCorrect ? 'Doğru' : 'Yanlış'} cevap için recent_answers güncellendi: ${recentAnswers.length} cevap.`);
 
   // Cevap logu
   const answerLog = composeGameEventLog('player_answer', {
@@ -525,6 +516,7 @@ function handleAnswer(player, answer) {
   });
   console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
 
+  // BURASI ÖNEMLİ: Cevap doğru veya yanlış olsun, her durumda answer_result göndereceğiz
   // Oyuncuya cevap sonucunu bildir
   sendToPlayer(player.ws, {
     type: MessageType.ANSWER_RESULT,
