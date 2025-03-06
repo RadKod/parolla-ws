@@ -97,13 +97,16 @@ function calculateRoundScores(roundIndex) {
       ar => ar.questionIndex === roundIndex
     );
     
+    // Zaman damgasını al (ya mevcut kayıttan ya da şu anki zamanı kullan)
+    const answerTimestamp = lastAnswerResult?.timestamp || Date.now();
+    
     // Eğer bulunamadıysa, yeni bir answerResult kaydı ekle
     if (!lastAnswerResult) {
       playerScoreData.answerResults.push({
         questionIndex: roundIndex,
         score: player.score,
         responseTime: responseTime,
-        timestamp: Date.now()
+        timestamp: answerTimestamp
       });
     }
     
@@ -114,6 +117,9 @@ function calculateRoundScores(roundIndex) {
       playerId,
       playerName: player.name,
       ...scoreInfo,
+      responseTime,                  // Cevap süresi (ms)
+      timestamp: answerTimestamp,    // Zaman damgası
+      attemptCount,                  // Deneme sayısı
       totalPlayerScore: playerScoreData.totalScore,
       currentScore: player.score // mevcut ANSWER_RESULT skoru
     });
@@ -138,13 +144,22 @@ function getGameScores() {
     
     if (!playerScore) continue;
     
+    // Her oyuncunun son cevabını ve süre bilgilerini bulalım
+    const lastAnswer = playerScore.answerResults && playerScore.answerResults.length > 0 
+      ? playerScore.answerResults[playerScore.answerResults.length - 1] 
+      : null;
+    
     scores.push({
       playerId,
       playerName: player.name,
       totalScore: playerScore.totalScore,
       roundScores: playerScore.rounds,
       answerHistory: playerScore.answerResults || [], // cevap geçmişi
-      lastScore: player.score // mevcut oyuncu skoru
+      lastScore: player.score, // mevcut oyuncu skoru
+      // Son cevap bilgileri
+      lastResponseTime: lastAnswer?.responseTime || null,
+      lastTimestamp: lastAnswer?.timestamp || null,
+      avgResponseTime: calculateAverageResponseTime(playerScore.answerResults)
     });
   }
   
@@ -152,6 +167,29 @@ function getGameScores() {
   scores.sort((a, b) => b.totalScore - a.totalScore);
   
   return scores;
+}
+
+/**
+ * Oyuncunun ortalama cevap süresini hesaplar
+ * @private
+ * @param {Array} answerResults Cevap sonuçları dizisi
+ * @returns {number|null} Ortalama cevap süresi (ms) veya null
+ */
+function calculateAverageResponseTime(answerResults) {
+  if (!answerResults || answerResults.length === 0) {
+    return null;
+  }
+  
+  // Sadece responseTime değeri olan sonuçları filtrele
+  const validResults = answerResults.filter(result => result.responseTime !== undefined && result.responseTime !== null);
+  
+  if (validResults.length === 0) {
+    return null;
+  }
+  
+  // Ortalama süreyi hesapla
+  const totalTime = validResults.reduce((sum, result) => sum + result.responseTime, 0);
+  return Math.round(totalTime / validResults.length);
 }
 
 /**
@@ -211,5 +249,6 @@ module.exports = {
   getGameScores,
   resetRoundScoring,
   addRecentAnswer,
-  getRecentAnswers
+  getRecentAnswers,
+  calculateAverageResponseTime
 }; 
