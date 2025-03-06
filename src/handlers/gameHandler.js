@@ -6,6 +6,7 @@ const { getUnlimitedQuestions } = require('../services/questionService');
 const { isAnswerCorrect } = require('../utils/stringUtils');
 const gameState = require('../state/gameState');
 const { composeGameEventLog, composeGameStatusLog } = require('../utils/logger');
+const { resetRoundScoring, calculateRoundScores, getGameScores } = require('../services/scoreService');
 
 /**
  * Oyunu başlatır ve soruları yükler
@@ -62,6 +63,9 @@ function sendNewQuestion() {
   // Round bazlı durumları sıfırla
   gameState.roundLives.clear();
   gameState.roundCorrectAnswers.clear();
+  
+  // Puanlama sistemi için sıfırlama yap
+  resetRoundScoring();
 
   // Tüm oyuncuların canlarını yenile
   for (const [_, player] of gameState.players) {
@@ -258,6 +262,9 @@ function handleTimeUp() {
     gameState.roundTimer = null;
   }
 
+  // Tur puanlarını hesapla
+  const roundScores = calculateRoundScores(gameState.questionIndex);
+
   // Doğru cevap mesajını oluştur
   const timeUpMessage = {
     type: MessageType.TIME_UP,
@@ -273,6 +280,20 @@ function handleTimeUp() {
   if (gameState.viewerCount > 0) {
     console.log(`${gameState.viewerCount} izleyiciye doğru cevap gönderiliyor`);
     broadcastToViewers(gameState.wss, timeUpMessage);
+  }
+
+  // Tur puanlarını gönder
+  if (roundScores.length > 0) {
+    const roundScoresMessage = {
+      type: MessageType.ROUND_SCORES,
+      scores: roundScores,
+      questionIndex: gameState.questionIndex
+    };
+    
+    console.log(`Tur puanları gönderiliyor: ${roundScores.length} oyuncu`);
+    
+    // Tüm oyunculara ve izleyicilere tur puanlarını gönder
+    broadcast(gameState.wss, roundScoresMessage, [], true);
   }
 
   // Bekleme süresini başlat
@@ -346,7 +367,7 @@ function handleTimeUp() {
 }
 
 /**
- * Oyuncunun cevabını işler
+ * Oyuncunun cevabını değerlendirir
  * @param {Player} player Oyuncu
  * @param {string} answer Cevap
  */
@@ -377,6 +398,10 @@ function handleAnswer(player, answer) {
     return;
   }
 
+  // Deneme sayısını takip et (puanlama için)
+  const currentAttempts = gameState.playerAttempts.get(roundKey) || 0;
+  gameState.playerAttempts.set(roundKey, currentAttempts + 1);
+  
   // Cevabı küçük harfe çevir ve boşlukları temizle
   const cleanAnswer = answer.toLowerCase().trim();
   
@@ -408,8 +433,33 @@ function handleAnswer(player, answer) {
     }
   } else {
     player.score += CORRECT_ANSWER_SCORE;
+    
     // Doğru cevap verdiğini kaydet
     gameState.roundCorrectAnswers.set(roundKey, true);
+    
+    // Yanıt süresini hesapla ve kaydet
+    const responseTime = gameState.ROUND_TIME - timeInfo.remaining;
+    gameState.playerTimes.set(roundKey, responseTime);
+    
+    // Doğru cevap veren oyuncular listesine ekle (sıralama için)
+    gameState.correctAnswerPlayers.push(player.id);
+    
+    // Oyuncunun skorunu playerScores'a da kaydet
+    let playerScoreData = gameState.playerScores.get(player.id) || {
+      totalScore: 0,
+      rounds: {},
+      answerResults: [] // Cevap sonuçlarını saklamak için yeni dizi
+    };
+    
+    // Cevap sonucunu kaydet
+    playerScoreData.answerResults.push({
+      questionIndex: gameState.questionIndex,
+      score: player.score,
+      responseTime: responseTime,
+      timestamp: Date.now()
+    });
+    
+    gameState.playerScores.set(player.id, playerScoreData);
   }
 
   // Cevap logu
@@ -423,11 +473,17 @@ function handleAnswer(player, answer) {
   });
   console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
 
+  // Oyuncuya cevap sonucunu bildir
   sendToPlayer(player.ws, {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
     lives: player.lives,
-    score: player.score
+    score: player.score,
+    // Ek bilgiler
+    questionIndex: gameState.questionIndex,
+    responseTime: isCorrect ? (gameState.ROUND_TIME - timeInfo.remaining) : null,
+    attemptCount: gameState.playerAttempts.get(roundKey) || 1,
+    timestamp: Date.now()
   });
 }
 
@@ -435,6 +491,21 @@ function handleAnswer(player, answer) {
  * Oyunu yeniden başlatır
  */
 async function handleGameRestart() {
+  // Genel puan tablosunu hesapla ve gönder
+  const gameScores = getGameScores();
+  
+  if (gameScores.length > 0) {
+    const gameScoresMessage = {
+      type: MessageType.GAME_SCORES,
+      scores: gameScores
+    };
+    
+    console.log(`Oyun puanları gönderiliyor: ${gameScores.length} oyuncu`);
+    
+    // Tüm oyunculara ve izleyicilere oyun puanlarını gönder
+    broadcast(gameState.wss, gameScoresMessage, [], true);
+  }
+  
   const restartMessage = {
     type: MessageType.GAME_RESTART
   };
@@ -454,6 +525,9 @@ async function handleGameRestart() {
   gameState.currentQuestion = null;
   gameState.lastQuestionTime = null;
   gameState.waitingStartTime = null;
+  
+  // Puanlama sistemini sıfırla
+  gameState.playerScores = new Map();
 
   if (gameState.roundTimer) {
     clearTimeout(gameState.roundTimer);

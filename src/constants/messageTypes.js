@@ -52,5 +52,14 @@ module.exports = {
   CHAT_MESSAGE: 'chat_message',
   
   /** Tüm chat mesajlarını bildirir */
-  CHAT_HISTORY: 'chat_history'
+  CHAT_HISTORY: 'chat_history',
+  
+  /** Oyuncunun puan durumunu bildirir */
+  SCORE_UPDATE: 'score_update',
+
+  /** Tur sonunda puan tablosunu bildirir */
+  ROUND_SCORES: 'round_scores',
+
+  /** Oyun sonunda genel puan tablosunu bildirir */
+  GAME_SCORES: 'game_scores'
 }; 

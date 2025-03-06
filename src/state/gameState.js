@@ -75,6 +75,12 @@ const gameState = {
   // Chat mesaj geçmişi
   chatHistory: [],
 
+  // Puanlama sistemi için alanlar
+  correctAnswerPlayers: [], // Her turda doğru cevap veren oyuncuların listesi
+  playerTimes: new Map(), // Oyuncuların cevap süreleri (roundIndex_playerId -> responseTime ms)
+  playerAttempts: new Map(), // Oyuncuların cevap hakları (roundIndex_playerId -> attemptCount)
+  playerScores: new Map(), // Oyuncuların puanları (playerId -> scoreObject)
+
   // Oyun ayarları
   ROUND_TIME,
   MAX_LIVES,
