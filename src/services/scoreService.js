@@ -225,13 +225,17 @@ function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) 
   const actualResponseTime = responseTime !== null ? responseTime : 
     (gameState.playerTimes.get(roundKey) || 0);
   
+  // Oyuncunun en güncel skor verisini al
+  const playerScoreData = gameState.playerScores.get(player.id);
+  const currentTotalScore = playerScoreData ? playerScoreData.totalScore : player.score;
+  
   // Yeni cevap bilgisi
   const recentAnswer = {
     playerId: player.id,
     playerName: player.name,
     isCorrect,
     questionIndex,
-    totalScore: player.score,
+    totalScore: currentTotalScore, // En güncel toplam puanı kullan
     responseTime: actualResponseTime, // Round başlangıcından itibaren geçen süre (ms)
     responseTimeSeconds: Math.floor(actualResponseTime / 1000), // Saniye cinsinden
     timestamp: Date.now() // Bu da Unix timestamp olarak kalabilir, karşılaştırma için

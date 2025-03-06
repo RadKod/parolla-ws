@@ -550,8 +550,23 @@ async function handleGameRestart() {
   gameState.lastQuestionTime = null;
   gameState.waitingStartTime = null;
   
-  // Puanlama sistemini sıfırla
-  gameState.playerScores = new Map();
+  // Puanlama sistemini sıfırlamak yerine, oyuncuların toplam puanlarını koru
+  // Ancak yeni round için gerekli yapıları temizle
+  for (const [playerId, playerScore] of gameState.playerScores) {
+    // Toplam puanı koru
+    const totalScore = playerScore.totalScore;
+    const answerHistory = playerScore.answerResults || [];
+    
+    // Tur bilgilerini sıfırla
+    playerScore.rounds = {};
+    
+    // Toplam puanı ve geçmiş cevapları koru
+    playerScore.totalScore = totalScore;
+    playerScore.answerResults = answerHistory;
+    
+    // Güncellenen veriyi geri kaydet
+    gameState.playerScores.set(playerId, playerScore);
+  }
   
   // Son cevaplar listesini de sıfırla
   gameState.recentAnswers = [];

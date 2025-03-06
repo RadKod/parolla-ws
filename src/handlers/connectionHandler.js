@@ -317,6 +317,9 @@ async function handleConnection(wss, ws, req) {
         is_permanent: existingPlayer.is_permanent
       };
 
+      // Oyuncu puanlarını sakla
+      const playerScoreData = gameState.playerScores.get(userData.id);
+
       // Oyuncu listesinden kaldır
       gameState.players.delete(userData.id);
       
@@ -332,6 +335,11 @@ async function handleConnection(wss, ws, req) {
       // Önceki durumu geri yükle
       player.lives = previousState.lives;
       player.score = previousState.score;
+      
+      // Eğer kayıtlı skor verisi varsa, yeni bağlantıda da kullan
+      if (playerScoreData) {
+        gameState.playerScores.set(userData.id, playerScoreData);
+      }
     } else {
       // Yeni oyuncuyu oluştur
       player = new Player(ws, userData);
