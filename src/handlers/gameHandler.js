@@ -451,27 +451,42 @@ function handleAnswer(player, answer) {
     // Doğru cevap veren oyuncular listesine ekle (sıralama için)
     gameState.correctAnswerPlayers.push(player.id);
     
-    // Oyuncunun skorunu playerScores'a da kaydet
+    // Oyuncunun skorunu kaydet ve güncelle
     let playerScoreData = gameState.playerScores.get(player.id) || {
       totalScore: 0,
       rounds: {},
-      answerResults: [] // Cevap sonuçlarını saklamak için yeni dizi
+      answerResults: []
     };
+    
+    // Doğru bildiği için sıralamasına göre puan hesapla
+    const playerRank = gameState.correctAnswerPlayers.length - 1; // 0-based index
+    
+    // Baz puanı belirle (sıralamaya göre)
+    const baseScore = playerRank < BASE_SCORES.length ? BASE_SCORES[playerRank] : 0;
+    
+    // Anlık hesaplanan puanı toplam puana ekle
+    playerScoreData.totalScore += baseScore;
+    
+    // Oyuncunun skorunu güncelle
+    player.score = playerScoreData.totalScore;
     
     // Cevap sonucunu kaydet
     playerScoreData.answerResults.push({
       questionIndex: gameState.questionIndex,
-      // Gerçek skor değil, sadece doğru cevap verdiğini göstermek için
-      score: playerScoreData.totalScore, // Anlık toplam skoru ekliyoruz
+      score: playerScoreData.totalScore, // Güncellenmiş toplam skoru kaydediyoruz
       responseTime: responseTime,
       timestamp: Date.now()
     });
     
     gameState.playerScores.set(player.id, playerScoreData);
     
-    // Oyuncunun score değerini playerScoreData.totalScore değerine eşitle 
-    // Not: Gerçek puan hesaplanması tur sonunda yapılacak fakat UI'da güncel skoru göstermek için
-    player.score = playerScoreData.totalScore;
+    // Yeni bir veri ekleyelim - bu round için tahmini sıralama ve puanı
+    gameState.roundEstimatedScores = gameState.roundEstimatedScores || new Map();
+    gameState.roundEstimatedScores.set(roundKey, {
+      rank: playerRank + 1,
+      score: baseScore,
+      totalScore: playerScoreData.totalScore
+    });
   }
 
   // Son cevaplar listesine ekle - response time değeri ile
@@ -500,7 +515,7 @@ function handleAnswer(player, answer) {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
     lives: player.lives,
-    score: player.score, // Anlık skoru gönderiyoruz
+    score: player.score, // Anlık güncellenmiş skoru gönderiyoruz
     // Ek bilgiler
     questionIndex: gameState.questionIndex,
     responseTime: responseTime, // Milisaniye cinsinden

@@ -87,10 +87,22 @@ function calculateRoundScores(roundIndex) {
     // Tur için yeni puanı ekle
     playerScoreData.rounds[roundIndex] = scoreInfo;
     
-    // Toplam puana tur puanını ekle
-    playerScoreData.totalScore += scoreInfo.totalScore;
+    // Eğer daha önce handleAnswer'da geçici puan verilmişse, 
+    // o puanı çıkart ve doğru puanı ekle
+    const estimatedScoreInfo = gameState.roundEstimatedScores ? 
+      gameState.roundEstimatedScores.get(roundKey) : null;
     
-    // Oyuncunun gerçek skorunu güncelle - ÖNEMLİ!
+    if (estimatedScoreInfo) {
+      // Geçici verilen puanı çıkart
+      playerScoreData.totalScore -= estimatedScoreInfo.score;
+      // Doğru puanı ekle
+      playerScoreData.totalScore += scoreInfo.totalScore;
+    } else {
+      // Toplam puana tur puanını ekle
+      playerScoreData.totalScore += scoreInfo.totalScore;
+    }
+    
+    // Oyuncunun gerçek skorunu güncelle
     player.score = playerScoreData.totalScore;
     
     // Eğer answerResults dizisi yoksa oluştur
@@ -265,7 +277,8 @@ function getRecentAnswers(limit = 50) {
  */
 function resetRoundScoring() {
   gameState.correctAnswerPlayers = [];
-  // Not: playerTimes ve playerAttempts haritaları sıfırlanmaz çünkü round_index eklenerek saklanıyor
+  // Geçici puanları da sıfırla
+  gameState.roundEstimatedScores = new Map();
 }
 
 module.exports = {
