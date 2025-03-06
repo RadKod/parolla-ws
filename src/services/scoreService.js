@@ -34,16 +34,14 @@ function calculatePlayerScore(playerId, responseTime, attemptCount, roundIndex) 
   // Baz puanı belirle (sıralamaya göre)
   const baseScore = BASE_SCORES[playerRank] || 0;
   
-  // Zaman bonusu hesapla
-  // Kalan süre oranını bul (0-1 arası)
-  const timeRatio = (ROUND_TIME - responseTime) / ROUND_TIME;
-  const timeBonus = Math.round(baseScore * TIME_BONUS_FACTOR * timeRatio);
+  // YENİ: Zaman bonusunu kaldırıyoruz, ekstra puan vermeyeceğiz
+  const timeBonus = 0;
   
   // YENİ: Hak cezası artık uygulanmıyor (kullanıcı bilemediğinde puanı düşmeyecek)
   const attemptPenalty = 0;
   
-  // Toplam puanı hesapla
-  const totalScore = Math.max(0, baseScore + timeBonus - attemptPenalty);
+  // Toplam puanı hesapla - sadece baseScore kullanılacak
+  const totalScore = baseScore;
   
   // Puan nesnesini döndür
   return {
