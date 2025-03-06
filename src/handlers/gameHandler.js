@@ -6,7 +6,7 @@ const { getUnlimitedQuestions } = require('../services/questionService');
 const { isAnswerCorrect } = require('../utils/stringUtils');
 const gameState = require('../state/gameState');
 const { composeGameEventLog, composeGameStatusLog } = require('../utils/logger');
-const { resetRoundScoring, calculateRoundScores, getGameScores } = require('../services/scoreService');
+const { resetRoundScoring, calculateRoundScores, getGameScores, addRecentAnswer, getRecentAnswers } = require('../services/scoreService');
 
 /**
  * Oyunu başlatır ve soruları yükler
@@ -462,6 +462,15 @@ function handleAnswer(player, answer) {
     gameState.playerScores.set(player.id, playerScoreData);
   }
 
+  // Son cevaplar listesine ekle
+  const recentAnswers = addRecentAnswer(player, isCorrect, gameState.questionIndex);
+  
+  // Son cevaplar listesini tüm oyunculara ve izleyicilere gönder
+  broadcast(gameState.wss, {
+    type: MessageType.RECENT_ANSWERS,
+    answers: recentAnswers
+  }, [], true);
+
   // Cevap logu
   const answerLog = composeGameEventLog('player_answer', {
     playerId: player.id,
@@ -528,6 +537,9 @@ async function handleGameRestart() {
   
   // Puanlama sistemini sıfırla
   gameState.playerScores = new Map();
+  
+  // Son cevaplar listesini de sıfırla
+  gameState.recentAnswers = [];
 
   if (gameState.roundTimer) {
     clearTimeout(gameState.roundTimer);

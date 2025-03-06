@@ -8,6 +8,7 @@ const gameState = require('../state/gameState');
 const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
 const { composePlayerEventLog, composeGameStatusLog } = require('../utils/logger');
 const url = require('url');
+const { getRecentAnswers } = require('../services/scoreService');
 
 /**
  * Token'ı temizler (Bearer prefix'ini kaldırır)
@@ -229,6 +230,15 @@ async function handleConnection(wss, ws, req) {
         chatHistory: gameState.chatHistory || []
       });
 
+      // Son cevaplar listesini gönder
+      const recentAnswers = getRecentAnswers();
+      if (recentAnswers.length > 0) {
+        sendToPlayer(ws, {
+          type: MessageType.RECENT_ANSWERS,
+          answers: recentAnswers
+        });
+      }
+
       // Eğer mevcut bir soru varsa, izleyiciye gönder
       if (gameState.currentQuestion) {
         console.log('İzleyiciye mevcut soru gönderiliyor:', gameState.currentQuestion.id);
@@ -435,6 +445,15 @@ async function handleConnection(wss, ws, req) {
       },
       chatHistory: gameState.chatHistory || []
     });
+
+    // Son cevaplar listesini gönder
+    const recentAnswers = getRecentAnswers();
+    if (recentAnswers.length > 0) {
+      sendToPlayer(player.ws, {
+        type: MessageType.RECENT_ANSWERS,
+        answers: recentAnswers
+      });
+    }
 
     // Hoş geldin mesajını gönder
     sendToPlayer(ws, {

@@ -61,5 +61,8 @@ module.exports = {
   ROUND_SCORES: 'round_scores',
 
   /** Oyun sonunda genel puan tablosunu bildirir */
-  GAME_SCORES: 'game_scores'
+  GAME_SCORES: 'game_scores',
+  
+  /** Son cevapları bildirir */
+  RECENT_ANSWERS: 'recent_answers'
 }; 

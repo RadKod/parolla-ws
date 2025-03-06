@@ -81,6 +81,9 @@ const gameState = {
   playerAttempts: new Map(), // Oyuncuların cevap hakları (roundIndex_playerId -> attemptCount)
   playerScores: new Map(), // Oyuncuların puanları (playerId -> scoreObject)
 
+  // Son cevaplar listesi
+  recentAnswers: [], // Son cevaplar (maksimum 20 cevap)
+
   // Oyun ayarları
   ROUND_TIME,
   MAX_LIVES,

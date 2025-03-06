@@ -155,6 +155,44 @@ function getGameScores() {
 }
 
 /**
+ * Son cevap listesine yeni cevap ekler
+ * @param {Object} player Oyuncu bilgisi
+ * @param {boolean} isCorrect Cevabın doğru olup olmadığı
+ * @param {number} questionIndex Soru indeksi
+ */
+function addRecentAnswer(player, isCorrect, questionIndex) {
+  // Yeni cevap bilgisi
+  const recentAnswer = {
+    playerId: player.id,
+    playerName: player.name,
+    isCorrect,
+    questionIndex,
+    totalScore: player.score,
+    timestamp: Date.now()
+  };
+  
+  // Son cevaplar listesinin başına ekle (en yeni en üstte)
+  gameState.recentAnswers.unshift(recentAnswer);
+  
+  // Maksimum 20 cevap tutulacak
+  if (gameState.recentAnswers.length > 20) {
+    gameState.recentAnswers.pop(); // En eski cevabı sil
+  }
+  
+  return gameState.recentAnswers;
+}
+
+/**
+ * Son cevaplar listesini döndürür
+ * @param {number} limit Döndürülecek maksimum cevap sayısı
+ * @returns {Array} Son cevaplar listesi
+ */
+function getRecentAnswers(limit = 20) {
+  // Listenin başından belirtilen limit kadar cevabı döndür
+  return gameState.recentAnswers.slice(0, limit);
+}
+
+/**
  * Yeni bir tur başladığında puanlama sistemini sıfırlar
  */
 function resetRoundScoring() {
@@ -166,5 +204,7 @@ module.exports = {
   calculatePlayerScore,
   calculateRoundScores,
   getGameScores,
-  resetRoundScoring
+  resetRoundScoring,
+  addRecentAnswer,
+  getRecentAnswers
 }; 
