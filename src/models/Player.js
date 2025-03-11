@@ -10,15 +10,33 @@ class Player {
     this.lives = userData.lives || MAX_LIVES; // Eğer önceki durum varsa onu kullan
     
     // API'den gelen başlangıç puanını kaydet
-    this.initialTourScore = userData.total_tour_score;
+    this.initialTourScore = userData.total_tour_score || 0;
     
-    // Öncelikle API'den gelen total_tour_score değerini kontrol et
-    // Eğer varsa onu kullan, yoksa önceki score veya 0 kullan
-    this.score = userData.total_tour_score !== undefined ? userData.total_tour_score : (userData.score || 0);
+    // Veritabanından gelen API puanını kullan (eğer varsa)
+    this.score = userData.total_tour_score || 0;
+    
+    // Oyun sırasında kazanılan puanları yerel olarak sakla
+    this.localScore = 0;
     
     this.lastConnectionTime = Date.now(); // Son bağlantı zamanını tut
     this.token = userData.token || null; // Kullanıcı token'ını sakla
     this.isJustJoined = true; // Yeni katıldı mı? Başlangıçta true olarak ayarla
+  }
+  
+  /**
+   * Oyun sırasında kazanılan puanları ekler
+   * @param {number} points Eklenecek puan
+   */
+  addPoints(points) {
+    this.localScore += points;
+  }
+  
+  /**
+   * Oyuncunun toplam puanını döndürür (DB puanı + oyun içi kazanılan)
+   * @returns {number} Toplam puan
+   */
+  getTotalScore() {
+    return this.score + this.localScore;
   }
 }
 

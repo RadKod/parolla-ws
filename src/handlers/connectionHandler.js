@@ -353,27 +353,15 @@ async function handleConnection(wss, ws, req) {
         token: token
       });
       
-      // API'den gelen total_tour_score değeri varsa ve önceki skordan daha yüksekse, onu kullan
+      // API'den gelen puan varsa kullan, yoksa sıfırla
       if (userData.total_tour_score !== undefined) {
-        // Başlangıç puanını API'den gelen değer olarak ayarla
-        player.initialTourScore = userData.total_tour_score;
-        
-        if (userData.total_tour_score > previousState.score) {
-          player.score = userData.total_tour_score;
-          console.log(`${player.name} için API'den daha yüksek bir puan alındı: ${userData.total_tour_score} > ${previousState.score}`);
-        } else {
-          // Önceki skor daha yüksekse onu koru
-          player.score = previousState.score;
-          console.log(`${player.name} için yerel skor korundu: ${previousState.score} >= ${userData.total_tour_score}`);
-        }
+        console.log(`${player.name} için API'den gelen puan kullanıldı: ${userData.total_tour_score}`);
       } else {
-        // Önceki durumu geri yükle (API'den total_tour_score gelmedi)
-        player.lives = previousState.lives;
-        player.score = previousState.score;
-        // Önceki başlangıç puanını koru
-        player.initialTourScore = previousState.initialTourScore;
-        console.log(`${player.name} için önceki skor kullanıldı: ${previousState.score}`);
+        console.log(`${player.name} için API'den puan gelmedi, sıfırlandı`);
       }
+      
+      // Oyun sırasında kazanılan puanları sıfırla
+      player.localScore = 0;
       
       // Yeniden bağlanan oyuncu için isJustJoined değerini false olarak ayarla
       player.isJustJoined = false;

@@ -18,8 +18,8 @@ function broadcastUserList() {
   
   // Oyuncu listesini oluştur
   for (const [_, player] of gameState.players) {
-    // API'den gelen başlangıç puanını veya oyundaki güncel puanı kullan
-    const displayedScore = player.score;
+    // API puanı + oyun sırasında kazanılan puanları göster
+    const displayedScore = player.getTotalScore ? player.getTotalScore() : player.score;
     
     playerList.push({
       id: player.id,
@@ -27,7 +27,8 @@ function broadcastUserList() {
       score: displayedScore,
       lives: player.lives,
       avatarUrl: player.avatarUrl || null,
-      total_tour_score: player.initialTourScore, // API'den gelen başlangıç puanını da gönder
+      apiScore: player.score, // API'den gelen saf puanı da gönder
+      localScore: player.localScore, // Oyun içinde kazanılan puanı gönder
       isJustJoined: player.isJustJoined // Yeni katıldı mı?
     });
     
@@ -374,40 +375,29 @@ function handleTimeUp() {
   if (gameState.players.size > 0) {
     console.log(`${gameState.players.size} oyuncunun puanları API'ye kaydediliyor...`);
     
-    // Tur puanlarını hesapla
-    const roundScores = calculateRoundScores(gameState.questionIndex);
-    
     // Her oyuncu için puan kaydet
     for (const [playerId, player] of gameState.players) {
       // Skoru kaydedecek fonksiyonu çağır
-      if (player.token && player.score > 0) {
-        // Bu turda kazanılan puanı al
-        const roundKey = `${gameState.questionIndex}_${player.id}`;
-        const roundData = gameState.roundEstimatedScores ? gameState.roundEstimatedScores.get(roundKey) : null;
+      if (player.token && player.localScore > 0) {
+        console.log(`${player.name} için tur puanı API'ye kaydediliyor: ${player.localScore} puan (API=${player.score}, Toplam=${player.getTotalScore()})`);
         
-        // Eğer bu turda puan kazandıysa API'ye kaydet
-        if (roundData && roundData.score > 0) {
-          console.log(`${player.name} için tur puanı API'ye kaydediliyor: ${roundData.score} puan`);
-          
-          savePlayerScoreToAPI(player.token, roundData.score)
-            .then(result => {
-              if (result) {
-                console.log(`${player.name} için puan kaydedildi: ${roundData.score} puan`);
-                
-                // Başarıyla kaydedilince initialTourScore değerini güncelle
-                player.initialTourScore = player.score;
-              } else {
-                console.log(`${player.name} için puan kaydedilemedi.`);
-              }
-            })
-            .catch(error => {
-              console.error(`${player.name} için puan kaydedilirken hata oluştu:`, error.message);
-            });
-        } else {
-          console.log(`${player.name} için puan kaydedilmedi: Bu turda puan kazanılmadı veya puan bilgisi bulunamadı`);
-        }
+        savePlayerScoreToAPI(player.token, player.localScore)
+          .then(result => {
+            if (result) {
+              console.log(`${player.name} için puan kaydedildi: ${player.localScore} puan`);
+              
+              // Başarıyla kaydedilince player.score değerini güncelle
+              player.score += player.localScore;
+              player.localScore = 0; // Yerel puanı sıfırla
+            } else {
+              console.log(`${player.name} için puan kaydedilemedi.`);
+            }
+          })
+          .catch(error => {
+            console.error(`${player.name} için puan kaydedilirken hata oluştu:`, error.message);
+          });
       } else {
-        console.log(`${player.name} için puan kaydedilmedi: Token yok veya skor 0`);
+        console.log(`${player.name} için puan kaydedilmedi: Token yok veya local puan 0`);
       }
     }
   }
@@ -594,11 +584,11 @@ function handleAnswer(player, answer) {
     // Baz puanı belirle (sıralamaya göre)
     const baseScore = playerRank < BASE_SCORES.length ? BASE_SCORES[playerRank] : 0;
     
-    // Anlık hesaplanan puanı toplam puana ekle
+    // Anlık hesaplanan puanı ekle
     playerScoreData.totalScore += baseScore;
     
-    // Oyuncunun skorunu güncelle
-    player.score = playerScoreData.totalScore;
+    // Oyuncunun oyun içi puanını güncelle (player.score yerine player.addPoints kullan)
+    player.addPoints(baseScore);
     
     // Cevap sonucunu kaydet
     playerScoreData.answerResults.push({
@@ -618,7 +608,7 @@ function handleAnswer(player, answer) {
       totalScore: playerScoreData.totalScore
     });
     
-    console.log(`${player.name} puanı güncellendi: ${player.score}`);
+    console.log(`${player.name} puanı güncellendi: Yerel=${player.localScore}, API=${player.score}, Toplam=${player.getTotalScore()}`);
     console.log(`DOĞRU CEVAP KONTROLÜ: isCorrect değeri = ${isCorrect}, roundKey = ${roundKey}`);
   }
 
@@ -639,13 +629,15 @@ function handleAnswer(player, answer) {
   console.log(`Recent Answers broadcast edildi (${isCorrect ? 'DOĞRU' : 'YANLIŞ'} cevap için), toplam ${recentAnswers.length} cevap, WebSocket çalışıyor mu: ${player.ws.readyState === 1}`);
 
   // Cevap sonucunu oyuncuya gönder - HEM DOĞRU HEM YANLIŞ CEVAPTA 
-  console.log(`ANSWER_RESULT göndermeden önce: isCorrect=${isCorrect}, player=${player.name}, lives=${player.lives}, score=${player.score}`);
+  console.log(`ANSWER_RESULT göndermeden önce: isCorrect=${isCorrect}, player=${player.name}, lives=${player.lives}, score=${player.getTotalScore()}`);
   
   const answerResultMessage = {
     type: MessageType.ANSWER_RESULT,
     correct: isCorrect,
     lives: player.lives,
-    score: player.score,
+    score: player.getTotalScore ? player.getTotalScore() : player.score,
+    apiScore: player.score,
+    localScore: player.localScore,
     questionIndex: gameState.questionIndex,
     responseTime: responseTime,
     responseTimeSeconds: Math.floor(responseTime / 1000),
@@ -656,128 +648,8 @@ function handleAnswer(player, answer) {
   
   try {
     sendToPlayer(player.ws, answerResultMessage);
-    console.log(`Answer Result başarıyla gönderildi (${isCorrect ? 'DOĞRU' : 'YANLIŞ'} cevap için): can=${player.lives}, puan=${player.score}, full data=${JSON.stringify(answerResultMessage)}`);
+    console.log(`Answer Result başarıyla gönderildi (${isCorrect ? 'DOĞRU' : 'YANLIŞ'} cevap için): can=${player.lives}, puan=${player.getTotalScore()}, full data=${JSON.stringify(answerResultMessage)}`);
   } catch (error) {
     console.error(`ANSWER_RESULT gönderirken hata oluştu (${player.name}): ${error.message}`);
   }
-  
-  // Cevap logu
-  const answerLog = composeGameEventLog('player_answer', {
-    playerId: player.id,
-    playerName: player.name,
-    answer: cleanAnswer,
-    isCorrect,
-    remainingLives: player.lives,
-    score: player.score,
-    responseTime
-  });
-  console.log('Player Answer:', JSON.stringify(answerLog, null, 2));
 }
-
-/**
- * Oyunu yeniden başlatır
- */
-async function handleGameRestart() {
-  // Genel puan tablosunu hesapla ve gönder
-  const gameScores = getGameScores();
-  
-  if (gameScores.length > 0) {
-    const gameScoresMessage = {
-      type: MessageType.GAME_SCORES,
-      scores: gameScores
-    };
-    
-    console.log(`Oyun puanları gönderiliyor: ${gameScores.length} oyuncu`);
-    
-    // Tüm oyunculara ve izleyicilere oyun puanlarını gönder
-    broadcast(gameState.wss, gameScoresMessage, [], true);
-  }
-  
-  const restartMessage = {
-    type: MessageType.GAME_RESTART
-  };
-  
-  console.log('Oyun yeniden başlatılıyor...');
-  
-  broadcast(gameState.wss, restartMessage, [], false);
-  
-  // İzleyicilere de yeniden başlatma mesajını gönder
-  if (gameState.viewerCount > 0) {
-    console.log(`${gameState.viewerCount} izleyiciye yeniden başlatma mesajı gönderiliyor`);
-    broadcastToViewers(gameState.wss, restartMessage);
-  }
-
-  // Oyun durumunu sıfırla
-  gameState.questionIndex = 0;
-  gameState.currentQuestion = null;
-  gameState.lastQuestionTime = null;
-  gameState.waitingStartTime = null;
-  
-  // Puanlama sistemini sıfırlamak yerine, oyuncuların toplam puanlarını koru
-  // Ancak yeni round için gerekli yapıları temizle
-  for (const [playerId, playerScore] of gameState.playerScores) {
-    // Toplam puanı koru
-    const totalScore = playerScore.totalScore;
-    const answerHistory = playerScore.answerResults || [];
-    
-    // Tur bilgilerini sıfırla
-    playerScore.rounds = {};
-    
-    // Toplam puanı ve geçmiş cevapları koru
-    playerScore.totalScore = totalScore;
-    playerScore.answerResults = answerHistory;
-    
-    // Güncellenen veriyi geri kaydet
-    gameState.playerScores.set(playerId, playerScore);
-  }
-  
-  // Son cevaplar listesini de sıfırla
-  gameState.recentAnswers = [];
-  
-  // Son cevaplar listesinin sıfırlandığını bildir
-  broadcast(gameState.wss, {
-    type: MessageType.RECENT_ANSWERS,
-    answers: []
-  }, [], true);
-
-  if (gameState.roundTimer) {
-    clearTimeout(gameState.roundTimer);
-    gameState.roundTimer = null;
-  }
-
-  if (gameState.timeUpdateInterval) {
-    clearInterval(gameState.timeUpdateInterval);
-    gameState.timeUpdateInterval = null;
-  }
-
-  // Yeni soruları yükle ve oyunu başlat
-  try {
-    gameState.questions = await getUnlimitedQuestions();
-    
-    setTimeout(() => {
-      sendNewQuestion();
-    }, 3000);
-  } catch (error) {
-    console.error('Oyun yeniden başlatma hatası:', error.message);
-    broadcast(gameState.wss, {
-      type: MessageType.ERROR,
-      message: 'Oyun yeniden başlatılamadı, lütfen daha sonra tekrar deneyin.'
-    });
-  }
-
-  // Oyun yeniden başlatma logu
-  const restartLog = composeGameEventLog('game_restart');
-  console.log('Game Restart:', JSON.stringify(restartLog, null, 2));
-}
-
-module.exports = {
-  initializeGame,
-  sendNewQuestion,
-  handleAnswer,
-  handleTimeUp,
-  handleGameRestart,
-  startTimeUpdateInterval,
-  broadcastUserList,
-  handleUserJoin,
-  handleUserLeave
-}; 
