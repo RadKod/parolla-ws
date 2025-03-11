@@ -316,6 +316,9 @@ async function handleConnection(wss, ws, req) {
       return;
     }
 
+    // Debug log ekle - API'den gelen veriyi göster
+    console.log(`API'den gelen kullanıcı verisi: ${JSON.stringify(userData)}`);
+    
     playerId = userData.id;
 
     // WebSocket nesnesine player ID'yi ekle
@@ -346,6 +349,9 @@ async function handleConnection(wss, ws, req) {
       // Kapanmanın tamamlanmasını bekle
       await new Promise(resolve => setTimeout(resolve, 100));
 
+      // Debug log ekle - total_tour_score değerini kontrol et
+      console.log(`${userData.name} için API'den gelen total_tour_score: ${userData.total_tour_score}, önceki score: ${previousState.score}`);
+
       // Yeni oyuncuyu önceki durumuyla oluştur
       player = new Player(ws, {
         ...userData,
@@ -353,11 +359,14 @@ async function handleConnection(wss, ws, req) {
         token: token
       });
       
-      // API'den gelen puan varsa kullan, yoksa sıfırla
+      // API'den gelen puan varsa kullan, yoksa önceki puanı koru
       if (userData.total_tour_score !== undefined) {
         console.log(`${player.name} için API'den gelen puan kullanıldı: ${userData.total_tour_score}`);
+        player.score = userData.total_tour_score;
       } else {
-        console.log(`${player.name} için API'den puan gelmedi, sıfırlandı`);
+        // API'den puan gelmemişse, önceki puanı koru
+        player.score = previousState.score;
+        console.log(`${player.name} için API'den puan gelmedi, önceki puan korundu: ${player.score}`);
       }
       
       // Oyun sırasında kazanılan puanları sıfırla
@@ -386,23 +395,30 @@ async function handleConnection(wss, ws, req) {
         }
       }
     } else {
+      // Debug log ekle - yeni oyuncu oluşturmadan önce API verilerini göster
+      console.log(`Yeni oyuncu oluşturuluyor: ${userData.name}, total_tour_score: ${userData.total_tour_score}`);
+      
       // Yeni oyuncuyu oluştur
       player = new Player(ws, {
         ...userData,
         token: token
       });
 
+      // Constructor sonrası score değerini kontrol et
+      console.log(`Yeni oyuncu constructor sonrası score değeri: player.score = ${player.score}, player.localScore = ${player.localScore}, toplam = ${player.getTotalScore()}`);
+
       // API'den gelen total_tour_score değeri varsa, playerScoreData'yı oluştur
       if (userData.total_tour_score !== undefined) {
         // Başlangıç puanını ayarla (Player sınıfında zaten yapıldı, burada vurgulamak için tekrar ediyoruz)
         player.initialTourScore = userData.total_tour_score;
+        player.score = userData.total_tour_score; // Puanı kesin olarak ayarla
         
         gameState.playerScores.set(userData.id, {
           totalScore: userData.total_tour_score,
           rounds: {},
           answerResults: []
         });
-        console.log(`Yeni oyuncu ${player.name} için playerScoreData oluşturuldu: ${userData.total_tour_score}`);
+        console.log(`Yeni oyuncu ${player.name} için playerScoreData oluşturuldu: ${userData.total_tour_score}, player.score = ${player.score}`);
       }
 
       // Eğer mevcut round'da can durumu varsa onu kullan

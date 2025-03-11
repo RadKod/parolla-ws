@@ -13,7 +13,11 @@ class Player {
     this.initialTourScore = userData.total_tour_score || 0;
     
     // Veritabanından gelen API puanını kullan (eğer varsa)
-    this.score = userData.total_tour_score || 0;
+    // Değerin undefined olmaması için kesinlikle 0 değerini kullan
+    this.score = userData.total_tour_score !== undefined ? userData.total_tour_score : 0;
+    
+    // Debug için konsola yazdır
+    console.log(`Player constructor: ${this.name} için score ayarlandı = ${this.score}, userData.total_tour_score = ${userData.total_tour_score}`);
     
     // Oyun sırasında kazanılan puanları yerel olarak sakla
     this.localScore = 0;
@@ -29,6 +33,8 @@ class Player {
    */
   addPoints(points) {
     this.localScore += points;
+    // Debug log ekle
+    console.log(`addPoints: ${this.name} için ${points} puan eklendi, yeni localScore = ${this.localScore}, toplam = ${this.getTotalScore()}`);
   }
   
   /**
@@ -36,7 +42,10 @@ class Player {
    * @returns {number} Toplam puan
    */
   getTotalScore() {
-    return this.score + this.localScore;
+    const total = this.score + this.localScore;
+    // Debug log ekle
+    console.log(`getTotalScore: ${this.name} için çağrıldı, score = ${this.score}, localScore = ${this.localScore}, toplam = ${total}`);
+    return total;
   }
 }
 
