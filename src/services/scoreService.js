@@ -244,17 +244,20 @@ function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) 
     const actualResponseTime = responseTime !== null ? responseTime : 
       (gameState.playerTimes.get(roundKey) || 0);
     
-    // Yeni cevap bilgisi - totalScore için doğrudan player.score kullan (anlık güncel skor)
+    // Toplam skoru hesapla - getTotalScore varsa kullan, yoksa doğrudan score'u kullan
+    const totalScore = player.getTotalScore ? player.getTotalScore() : player.score;
+    
+    // Yeni cevap bilgisi - sadece toplam puanı göster, ekstra alan kullanma
     const recentAnswer = {
       playerId: player.id,
       playerName: player.name,
       isCorrect,
       questionIndex,
-      totalScore: player.score, // Doğrudan güncel skoru kullan
-      responseTime: actualResponseTime, // Round başlangıcından itibaren geçen süre (ms)
-      responseTimeSeconds: Math.floor(actualResponseTime / 1000), // Saniye cinsinden
-      answerTimeDescription: `${Math.floor(actualResponseTime / 1000)} saniyede cevaplandı`, // Açıklayıcı bilgi
-      timestamp: Date.now() // Bu da Unix timestamp olarak kalabilir, karşılaştırma için
+      totalScore: totalScore, // Kullanıcının güncel toplam puanı
+      responseTime: actualResponseTime,
+      responseTimeSeconds: Math.floor(actualResponseTime / 1000),
+      answerTimeDescription: `${Math.floor(actualResponseTime / 1000)} saniyede cevaplandı`,
+      timestamp: Date.now()
     };
     
     // Eğer liste henüz oluşturulmamışsa oluştur
@@ -271,8 +274,8 @@ function addRecentAnswer(player, isCorrect, questionIndex, responseTime = null) 
       gameState.recentAnswers = gameState.recentAnswers.slice(0, 50); // Sadece ilk 50 cevabı tut
     }
     
-    // Debug log - doğru cevaplarda sorun olabilir
-    console.log(`Recent Answer added: ${player.name}, isCorrect: ${isCorrect}, totalScore: ${player.score}, recentAnswers.length: ${gameState.recentAnswers.length}, eklenen veriler: ${JSON.stringify(recentAnswer)}`);
+    // Debug log - basitleştirilmiş log mesajı
+    console.log(`Recent Answer added: ${player.name}, isCorrect: ${isCorrect}, totalScore: ${totalScore}, recentAnswers.length: ${gameState.recentAnswers.length}`);
     
     return gameState.recentAnswers;
   } catch (error) {
