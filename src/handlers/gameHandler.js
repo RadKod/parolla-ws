@@ -386,9 +386,27 @@ function handleTimeUp() {
             if (result) {
               console.log(`${player.name} için puan kaydedildi: ${player.localScore} puan`);
               
-              // Başarıyla kaydedilince player.score değerini güncelle
-              player.score += player.localScore;
-              player.localScore = 0; // Yerel puanı sıfırla
+              // API yanıtını kontrol et
+              let apiTotalScore = null;
+              
+              // result'ın kendisi bir nesne olabilir veya data içinde olabilir
+              if (result.total_tour_score !== undefined) {
+                apiTotalScore = result.total_tour_score;
+              } else if (result.data && result.data.total_tour_score !== undefined) {
+                apiTotalScore = result.data.total_tour_score;
+              }
+              
+              if (apiTotalScore !== null) {
+                // API'den yeni toplam puan döndüyse, kullan
+                console.log(`${player.name} için API'den dönen yeni toplam puan: ${apiTotalScore}`);
+                player.score = apiTotalScore;
+              } else {
+                // API'den toplam puan dönmediyse, bu tur öncesi puanı koru
+                console.log(`${player.name} için API'den total_tour_score dönmedi, var olan puanı koruyoruz: ${player.score}`);
+              }
+              
+              // Yerel puanı sıfırla - puan API'ye kaydedildi, artık local değil
+              player.localScore = 0;
             } else {
               console.log(`${player.name} için puan kaydedilemedi.`);
             }
