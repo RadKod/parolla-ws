@@ -7,6 +7,8 @@ const {
   MAX_LIVES,
   ROUND_TIME
 } = require('../config/game.config');
+const { API_URL } = require('../config/api.config');
+const axios = require('axios');
 
 /**
  * Oyuncuya bu turdaki puanını hesaplar ve kaydeder
@@ -298,6 +300,43 @@ function resetRoundScoring() {
   gameState.roundEstimatedScores = new Map();
 }
 
+/**
+ * Oyuncunun puanını API'ye kaydeder
+ * @param {string} token Oyuncunun JWT token'ı
+ * @param {number} score Kaydedilecek puan
+ * @returns {Promise<Object|null>} API yanıtı veya hata durumunda null
+ */
+async function savePlayerScoreToAPI(token, score) {
+  try {
+    if (!token || !score) {
+      console.error('Token veya skor geçersiz:', { token: !!token, score });
+      return null;
+    }
+
+    console.log(`Skor kaydediliyor: ${score} puan`);
+    
+    const response = await axios.post(
+      `${API_URL}/tour/scores`, 
+      { score }, 
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    console.log(`Skor API yanıtı: ${response.status}`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Skor kaydetme hatası:', error.message);
+    if (error.response) {
+      console.error('API yanıtı:', error.response.status, error.response.data);
+    }
+    return null;
+  }
+}
+
 module.exports = {
   calculatePlayerScore,
   calculateRoundScores,
@@ -305,5 +344,6 @@ module.exports = {
   resetRoundScoring,
   addRecentAnswer,
   getRecentAnswers,
-  calculateAverageResponseTime
+  calculateAverageResponseTime,
+  savePlayerScoreToAPI
 }; 

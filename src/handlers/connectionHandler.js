@@ -333,7 +333,8 @@ async function handleConnection(wss, ws, req) {
       const previousState = {
         lives: existingPlayer.lives,
         score: existingPlayer.score,
-        is_permanent: existingPlayer.is_permanent
+        is_permanent: existingPlayer.is_permanent,
+        initialTourScore: existingPlayer.initialTourScore
       };
 
       // Oyuncu puanlarını sakla
@@ -348,20 +349,70 @@ async function handleConnection(wss, ws, req) {
       // Yeni oyuncuyu önceki durumuyla oluştur
       player = new Player(ws, {
         ...userData,
-        is_permanent: previousState.is_permanent
+        is_permanent: previousState.is_permanent,
+        token: token
       });
       
-      // Önceki durumu geri yükle
-      player.lives = previousState.lives;
-      player.score = previousState.score;
+      // API'den gelen total_tour_score değeri varsa ve önceki skordan daha yüksekse, onu kullan
+      if (userData.total_tour_score !== undefined) {
+        // Başlangıç puanını API'den gelen değer olarak ayarla
+        player.initialTourScore = userData.total_tour_score;
+        
+        if (userData.total_tour_score > previousState.score) {
+          player.score = userData.total_tour_score;
+          console.log(`${player.name} için API'den daha yüksek bir puan alındı: ${userData.total_tour_score} > ${previousState.score}`);
+        } else {
+          // Önceki skor daha yüksekse onu koru
+          player.score = previousState.score;
+          console.log(`${player.name} için yerel skor korundu: ${previousState.score} >= ${userData.total_tour_score}`);
+        }
+      } else {
+        // Önceki durumu geri yükle (API'den total_tour_score gelmedi)
+        player.lives = previousState.lives;
+        player.score = previousState.score;
+        // Önceki başlangıç puanını koru
+        player.initialTourScore = previousState.initialTourScore;
+        console.log(`${player.name} için önceki skor kullanıldı: ${previousState.score}`);
+      }
       
       // Eğer kayıtlı skor verisi varsa, yeni bağlantıda da kullan
       if (playerScoreData) {
+        // API'den gelen total_tour_score değeri daha yüksekse, playerScoreData'yı güncelle
+        if (userData.total_tour_score !== undefined && userData.total_tour_score > playerScoreData.totalScore) {
+          playerScoreData.totalScore = userData.total_tour_score;
+          console.log(`${player.name} için playerScoreData güncellendi: ${userData.total_tour_score}`);
+        }
         gameState.playerScores.set(userData.id, playerScoreData);
+      } else {
+        // Eğer playerScoreData yoksa, API'den gelen total_tour_score değeri ile oluştur
+        if (userData.total_tour_score !== undefined) {
+          gameState.playerScores.set(userData.id, {
+            totalScore: userData.total_tour_score,
+            rounds: {},
+            answerResults: []
+          });
+          console.log(`${player.name} için yeni playerScoreData oluşturuldu: ${userData.total_tour_score}`);
+        }
       }
     } else {
       // Yeni oyuncuyu oluştur
-      player = new Player(ws, userData);
+      player = new Player(ws, {
+        ...userData,
+        token: token
+      });
+
+      // API'den gelen total_tour_score değeri varsa, playerScoreData'yı oluştur
+      if (userData.total_tour_score !== undefined) {
+        // Başlangıç puanını ayarla (Player sınıfında zaten yapıldı, burada vurgulamak için tekrar ediyoruz)
+        player.initialTourScore = userData.total_tour_score;
+        
+        gameState.playerScores.set(userData.id, {
+          totalScore: userData.total_tour_score,
+          rounds: {},
+          answerResults: []
+        });
+        console.log(`Yeni oyuncu ${player.name} için playerScoreData oluşturuldu: ${userData.total_tour_score}`);
+      }
 
       // Eğer mevcut round'da can durumu varsa onu kullan
       if (gameState.currentQuestion) {

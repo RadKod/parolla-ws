@@ -6,7 +6,7 @@ const { getUnlimitedQuestions } = require('../services/questionService');
 const { isAnswerCorrect } = require('../utils/stringUtils');
 const gameState = require('../state/gameState');
 const { composeGameEventLog, composeGameStatusLog } = require('../utils/logger');
-const { resetRoundScoring, calculateRoundScores, getGameScores, addRecentAnswer, getRecentAnswers } = require('../services/scoreService');
+const { resetRoundScoring, calculateRoundScores, getGameScores, addRecentAnswer, getRecentAnswers, savePlayerScoreToAPI } = require('../services/scoreService');
 
 /**
  * Oyundaki kullanıcı listesini client'a gönderir
@@ -359,6 +359,48 @@ function handleTimeUp() {
   
   // Tüm oyunculara ve izleyicilere tur puanlarını gönder
   broadcast(gameState.wss, roundScoresMessage, [], true);
+
+  // Oyuncuların puanlarını API'ye kaydet
+  if (gameState.players.size > 0) {
+    console.log(`${gameState.players.size} oyuncunun puanları API'ye kaydediliyor...`);
+    
+    // Tur puanlarını hesapla
+    const roundScores = calculateRoundScores(gameState.questionIndex);
+    
+    // Her oyuncu için puan kaydet
+    for (const [playerId, player] of gameState.players) {
+      // Skoru kaydedecek fonksiyonu çağır
+      if (player.token && player.score > 0) {
+        // Bu turda kazanılan puanı al
+        const roundKey = `${gameState.questionIndex}_${player.id}`;
+        const roundData = gameState.roundEstimatedScores ? gameState.roundEstimatedScores.get(roundKey) : null;
+        
+        // Eğer bu turda puan kazandıysa API'ye kaydet
+        if (roundData && roundData.score > 0) {
+          console.log(`${player.name} için tur puanı API'ye kaydediliyor: ${roundData.score} puan`);
+          
+          savePlayerScoreToAPI(player.token, roundData.score)
+            .then(result => {
+              if (result) {
+                console.log(`${player.name} için puan kaydedildi: ${roundData.score} puan`);
+                
+                // Başarıyla kaydedilince initialTourScore değerini güncelle
+                player.initialTourScore = player.score;
+              } else {
+                console.log(`${player.name} için puan kaydedilemedi.`);
+              }
+            })
+            .catch(error => {
+              console.error(`${player.name} için puan kaydedilirken hata oluştu:`, error.message);
+            });
+        } else {
+          console.log(`${player.name} için puan kaydedilmedi: Bu turda puan kazanılmadı veya puan bilgisi bulunamadı`);
+        }
+      } else {
+        console.log(`${player.name} için puan kaydedilmedi: Token yok veya skor 0`);
+      }
+    }
+  }
 
   // Bekleme süresini başlat
   gameState.waitingStartTime = Date.now();
