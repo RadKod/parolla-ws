@@ -54,9 +54,6 @@ function handleDisconnect(playerId) {
     // Oyuncuyu listeden kaldır
     gameState.players.delete(playerId);
     
-    // Kullanıcı listesini güncelle ve broadcast et
-    handleUserLeave(player);
-    
     if (gameState.players.size === 0) {
       // Tüm zamanlayıcıları temizle
       if (gameState.roundTimer) {
@@ -233,6 +230,25 @@ async function handleConnection(wss, ws, req) {
         chatHistory: gameState.chatHistory || []
       });
 
+      // Oyuncu listesini ayrı bir mesaj olarak gönder
+      const playerList = Array.from(gameState.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        score: p.score,
+        lives: p.lives,
+        avatarUrl: p.avatarUrl || null
+      }));
+      
+      // Oyuncu listesini skora göre büyükten küçüğe sırala
+      playerList.sort((a, b) => b.score - a.score);
+      
+      sendToPlayer(ws, {
+        type: MessageType.USER_LIST,
+        players: playerList,
+        totalCount: playerList.length,
+        viewerCount: gameState.viewerCount || 0
+      });
+
       // Son cevaplar listesini gönder
       const recentAnswers = getRecentAnswers();
       if (recentAnswers.length > 0) {
@@ -389,7 +405,7 @@ async function handleConnection(wss, ws, req) {
     gameState.players.set(userData.id, player);
 
     // Kullanıcı listesini güncelle ve broadcast et
-    handleUserJoin(player);
+    // handleUserJoin(player); // İki kere mesaj gitmesine neden oluyor, kaldırdım
     
     // Bağlantı logu
     const connectLog = composePlayerEventLog('join', player);
@@ -458,6 +474,25 @@ async function handleConnection(wss, ws, req) {
         viewerCount: gameState.viewerCount
       },
       chatHistory: gameState.chatHistory || []
+    });
+
+    // Oyuncu listesini ayrı bir mesaj olarak gönder
+    const playerList = Array.from(gameState.players.values()).map(p => ({
+      id: p.id,
+      name: p.name,
+      score: p.score,
+      lives: p.lives,
+      avatarUrl: p.avatarUrl || null
+    }));
+    
+    // Oyuncu listesini skora göre büyükten küçüğe sırala
+    playerList.sort((a, b) => b.score - a.score);
+    
+    sendToPlayer(player.ws, {
+      type: MessageType.USER_LIST,
+      players: playerList,
+      totalCount: playerList.length,
+      viewerCount: gameState.viewerCount || 0
     });
 
     // Son cevaplar listesini gönder
