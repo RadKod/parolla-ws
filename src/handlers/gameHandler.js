@@ -9,6 +9,59 @@ const { composeGameEventLog, composeGameStatusLog } = require('../utils/logger')
 const { resetRoundScoring, calculateRoundScores, getGameScores, addRecentAnswer, getRecentAnswers } = require('../services/scoreService');
 
 /**
+ * Oyundaki kullanıcı listesini client'a gönderir
+ */
+function broadcastUserList() {
+  if (!gameState.wss) return;
+  
+  const playerList = [];
+  
+  // Oyuncu listesini oluştur
+  for (const [_, player] of gameState.players) {
+    playerList.push({
+      id: player.id,
+      name: player.name,
+      score: player.score,
+      lives: player.lives,
+      avatarUrl: player.avatarUrl || null
+    });
+  }
+  
+  // Oyuncu listesini büyükten küçüğe sırala (skora göre)
+  playerList.sort((a, b) => b.score - a.score);
+  
+  const userListMessage = {
+    type: MessageType.USER_LIST,
+    players: playerList,
+    totalCount: playerList.length,
+    viewerCount: gameState.viewerCount || 0
+  };
+  
+  console.log(`Kullanıcı listesi güncelleniyor: ${playerList.length} oyuncu, ${gameState.viewerCount || 0} izleyici`);
+  
+  // Tüm oyunculara ve izleyicilere kullanıcı listesini gönder
+  broadcast(gameState.wss, userListMessage, [], true);
+}
+
+/**
+ * Kullanıcı odaya katıldığında listeyi günceller
+ * @param {Object} player Oyuncu bilgileri
+ */
+function handleUserJoin(player) {
+  console.log(`Yeni kullanıcı katıldı: ${player.name} (${player.id})`);
+  broadcastUserList();
+}
+
+/**
+ * Kullanıcı odadan ayrıldığında listeyi günceller
+ * @param {Object} player Oyuncu bilgileri
+ */
+function handleUserLeave(player) {
+  console.log(`Kullanıcı ayrıldı: ${player.name} (${player.id})`);
+  broadcastUserList();
+}
+
+/**
  * Oyunu başlatır ve soruları yükler
  */
 async function initializeGame() {
@@ -131,6 +184,9 @@ function sendNewQuestion() {
     totalQuestions: gameState.questions.length
   });
   console.log('New Question:', JSON.stringify(questionLog, null, 2));
+
+  // Kullanıcı listesini güncelle ve broadcast et
+  broadcastUserList();
 }
 
 /**
@@ -372,6 +428,9 @@ function handleTimeUp() {
     correctAnswer: gameState.currentQuestion.answer
   });
   console.log('Time Up:', JSON.stringify(timeUpLog, null, 2));
+
+  // Kullanıcı listesini güncelle ve broadcast et
+  broadcastUserList();
 }
 
 /**
@@ -665,5 +724,8 @@ module.exports = {
   handleAnswer,
   handleTimeUp,
   handleGameRestart,
-  startTimeUpdateInterval
+  startTimeUpdateInterval,
+  broadcastUserList,
+  handleUserJoin,
+  handleUserLeave
 }; 

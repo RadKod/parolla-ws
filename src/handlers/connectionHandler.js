@@ -5,7 +5,7 @@ const { getUserFromAPI } = require('../services/authService');
 const { broadcast, sendToPlayer, broadcastToViewers, sendSystemMessage } = require('../utils/websocket');
 const { getRemainingTime, getRemainingWaitingTime } = require('../services/timeService');
 const gameState = require('../state/gameState');
-const { sendNewQuestion, startTimeUpdateInterval } = require('./gameHandler');
+const { sendNewQuestion, startTimeUpdateInterval, handleUserJoin, handleUserLeave } = require('./gameHandler');
 const { composePlayerEventLog, composeGameStatusLog } = require('../utils/logger');
 const url = require('url');
 const { getRecentAnswers } = require('../services/scoreService');
@@ -53,6 +53,9 @@ function handleDisconnect(playerId) {
 
     // Oyuncuyu listeden kaldır
     gameState.players.delete(playerId);
+    
+    // Kullanıcı listesini güncelle ve broadcast et
+    handleUserLeave(player);
     
     if (gameState.players.size === 0) {
       // Tüm zamanlayıcıları temizle
@@ -385,6 +388,9 @@ async function handleConnection(wss, ws, req) {
     // Oyuncuyu kaydet
     gameState.players.set(userData.id, player);
 
+    // Kullanıcı listesini güncelle ve broadcast et
+    handleUserJoin(player);
+    
     // Bağlantı logu
     const connectLog = composePlayerEventLog('join', player);
     console.log('Player Connect:', JSON.stringify(connectLog, null, 2));

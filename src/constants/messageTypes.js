@@ -64,5 +64,8 @@ module.exports = {
   GAME_SCORES: 'game_scores',
   
   /** Son cevapları bildirir */
-  RECENT_ANSWERS: 'recent_answers'
+  RECENT_ANSWERS: 'recent_answers',
+  
+  /** Oyundaki kullanıcı listesini bildirir */
+  USER_LIST: 'user_list'
 }; 
