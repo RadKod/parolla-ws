@@ -46,7 +46,8 @@ async function getUserFromAPI(token) {
         id: response.data.data.id,
         name: response.data.data.username,
         fingerprint: response.data.data.fingerprint,
-        is_permanent: response.data.data.is_permanent
+        is_permanent: response.data.data.is_permanent,
+        total_tour_score: response.data.data.total_tour_score
       };
     }
     
@@ -72,7 +73,8 @@ async function getUserFromAPI(token) {
         id: userData.id,
         name: userData.username,
         fingerprint: userData.fingerprint,
-        is_permanent: userData.is_permanent
+        is_permanent: userData.is_permanent,
+        total_tour_score: userData.total_tour_score
       };
     }
     
