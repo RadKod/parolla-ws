@@ -18,6 +18,7 @@ class Player {
     
     this.lastConnectionTime = Date.now(); // Son bağlantı zamanını tut
     this.token = userData.token || null; // Kullanıcı token'ını sakla
+    this.isJustJoined = true; // Yeni katıldı mı? Başlangıçta true olarak ayarla
   }
 }
 

@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const MessageType = require('../constants/messageTypes');
+const Player = require('../models/Player');
 
 /**
  * Tüm bağlı istemcilere mesaj gönderir
@@ -59,73 +60,38 @@ function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) 
  * @param {Object} message Gönderilecek mesaj
  */
 function sendToPlayer(ws, message) {
-  if (!ws) {
-    console.error('Invalid WebSocket connection');
-    return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    return false;
   }
 
   try {
-    if (ws.readyState !== WebSocket.OPEN) {
-      console.error(`WebSocket is not open (readyState=${ws.readyState}), message type=${message.type}`);
-      return;
-    }
-
     const jsonMessage = JSON.stringify(message);
-    
-    // ANSWER_RESULT mesajları için özel kontrol
-    if (message.type === 'ANSWER_RESULT') {
-      const isCorrect = message.correct;
-      console.log(`sendToPlayer ANSWER_RESULT: correct=${isCorrect}, msg-length=${jsonMessage.length}`);
-    }
-    
     ws.send(jsonMessage);
+    return true;
   } catch (error) {
-    console.error(`SendToPlayer error (message type=${message.type}):`, error);
-    try {
-      ws.terminate();
-    } catch (e) {
-      console.error('Client termination error:', e);
-    }
+    console.error('Send to player error:', error.message);
+    return false;
   }
 }
 
 /**
- * Sadece izleyicilere mesaj gönderir
+ * İzleyicilere mesaj gönderir
  * @param {WebSocket.Server} wss WebSocket sunucusu
  * @param {Object} message Gönderilecek mesaj
  */
 function broadcastToViewers(wss, message) {
-  if (!wss || !wss.clients) {
-    console.error('Invalid WebSocket server or no clients');
-    return;
-  }
+  if (!wss || !wss.clients) return;
 
-  try {
-    const jsonMessage = JSON.stringify(message);
-    const clients = Array.from(wss.clients);
-    
-    for (const client of clients) {
+  wss.clients.forEach((client) => {
+    // Sadece izleyicilere gönder
+    if (client.readyState === WebSocket.OPEN && client._isViewer) {
       try {
-        if (client.readyState !== WebSocket.OPEN) {
-          continue;
-        }
-
-        // Sadece izleyicilere gönder
-        if (client._isViewer) {
-          client.send(jsonMessage);
-        }
+        client.send(JSON.stringify(message));
       } catch (error) {
-        console.error('Error sending to viewer:', error);
-        try {
-          client.terminate();
-        } catch (e) {
-          console.error('Client termination error:', e);
-        }
+        console.error('Broadcast to viewer error:', error.message);
       }
     }
-  } catch (error) {
-    console.error('Broadcast to viewers error:', error);
-  }
+  });
 }
 
 /**

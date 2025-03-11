@@ -18,13 +18,23 @@ function broadcastUserList() {
   
   // Oyuncu listesini oluştur
   for (const [_, player] of gameState.players) {
+    // API'den gelen başlangıç puanını veya oyundaki güncel puanı kullan
+    const displayedScore = player.score;
+    
     playerList.push({
       id: player.id,
       name: player.name,
-      score: player.score,
+      score: displayedScore,
       lives: player.lives,
-      avatarUrl: player.avatarUrl || null
+      avatarUrl: player.avatarUrl || null,
+      total_tour_score: player.initialTourScore, // API'den gelen başlangıç puanını da gönder
+      isJustJoined: player.isJustJoined // Yeni katıldı mı?
     });
+    
+    // İlk broadcasttan sonra isJustJoined değerini false yap
+    if (player.isJustJoined) {
+      player.isJustJoined = false;
+    }
   }
   
   // Oyuncu listesini büyükten küçüğe sırala (skora göre)

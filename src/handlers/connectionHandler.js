@@ -375,6 +375,9 @@ async function handleConnection(wss, ws, req) {
         console.log(`${player.name} için önceki skor kullanıldı: ${previousState.score}`);
       }
       
+      // Yeniden bağlanan oyuncu için isJustJoined değerini false olarak ayarla
+      player.isJustJoined = false;
+      
       // Eğer kayıtlı skor verisi varsa, yeni bağlantıda da kullan
       if (playerScoreData) {
         // API'den gelen total_tour_score değeri daha yüksekse, playerScoreData'yı güncelle
