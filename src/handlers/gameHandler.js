@@ -653,3 +653,111 @@ function handleAnswer(player, answer) {
     console.error(`ANSWER_RESULT gönderirken hata oluştu (${player.name}): ${error.message}`);
   }
 }
+
+/**
+ * Oyunu yeniden başlatır
+ */
+async function handleGameRestart() {
+  // Genel puan tablosunu hesapla ve gönder
+  const gameScores = getGameScores();
+  
+  if (gameScores.length > 0) {
+    const gameScoresMessage = {
+      type: MessageType.GAME_SCORES,
+      scores: gameScores
+    };
+    
+    console.log(`Oyun puanları gönderiliyor: ${gameScores.length} oyuncu`);
+    
+    // Tüm oyunculara ve izleyicilere oyun puanlarını gönder
+    broadcast(gameState.wss, gameScoresMessage, [], true);
+  }
+  
+  const restartMessage = {
+    type: MessageType.GAME_RESTART
+  };
+  
+  console.log('Oyun yeniden başlatılıyor...');
+  
+  broadcast(gameState.wss, restartMessage, [], false);
+  
+  // İzleyicilere de yeniden başlatma mesajını gönder
+  if (gameState.viewerCount > 0) {
+    console.log(`${gameState.viewerCount} izleyiciye yeniden başlatma mesajı gönderiliyor`);
+    broadcastToViewers(gameState.wss, restartMessage);
+  }
+
+  // Oyun durumunu sıfırla
+  gameState.questionIndex = 0;
+  gameState.currentQuestion = null;
+  gameState.lastQuestionTime = null;
+  gameState.waitingStartTime = null;
+  
+  // Puanlama sistemini sıfırlamak yerine, oyuncuların toplam puanlarını koru
+  // Ancak yeni round için gerekli yapıları temizle
+  for (const [playerId, playerScore] of gameState.playerScores) {
+    // Toplam puanı koru
+    const totalScore = playerScore.totalScore;
+    const answerHistory = playerScore.answerResults || [];
+    
+    // Tur bilgilerini sıfırla
+    playerScore.rounds = {};
+    
+    // Toplam puanı ve geçmiş cevapları koru
+    playerScore.totalScore = totalScore;
+    playerScore.answerResults = answerHistory;
+    
+    // Güncellenen veriyi geri kaydet
+    gameState.playerScores.set(playerId, playerScore);
+  }
+  
+  // Son cevaplar listesini de sıfırla
+  gameState.recentAnswers = [];
+  
+  // Son cevaplar listesinin sıfırlandığını bildir
+  broadcast(gameState.wss, {
+    type: MessageType.RECENT_ANSWERS,
+    answers: []
+  }, [], true);
+
+  if (gameState.roundTimer) {
+    clearTimeout(gameState.roundTimer);
+    gameState.roundTimer = null;
+  }
+
+  if (gameState.timeUpdateInterval) {
+    clearInterval(gameState.timeUpdateInterval);
+    gameState.timeUpdateInterval = null;
+  }
+
+  // Yeni soruları yükle ve oyunu başlat
+  try {
+    gameState.questions = await getUnlimitedQuestions();
+    
+    setTimeout(() => {
+      sendNewQuestion();
+    }, 3000);
+  } catch (error) {
+    console.error('Oyun yeniden başlatma hatası:', error.message);
+    broadcast(gameState.wss, {
+      type: MessageType.ERROR,
+      message: 'Oyun yeniden başlatılamadı, lütfen daha sonra tekrar deneyin.'
+    });
+  }
+
+  // Oyun yeniden başlatma logu
+  const restartLog = composeGameEventLog('game_restart');
+  console.log('Game Restart:', JSON.stringify(restartLog, null, 2));
+}
+
+module.exports = {
+  initializeGame,
+  sendNewQuestion,
+  handleAnswer,
+  handleTimeUp,
+  handleGameRestart,
+  startTimeUpdateInterval,
+  broadcastUserList,
+  handleUserJoin,
+  handleUserLeave
+};
