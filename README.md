@@ -128,21 +128,39 @@ const ws = new WebSocket('ws://localhost:1881?token=your_jwt_token');
 
 ## WebSocket Mesaj Tipleri
 
-### Sunucudan Gelen Mesajlar
+### Bağlantı ve Sistem Mesajları
 
-- `CONNECTED`: Oyuncunun başarıyla bağlandığını bildirir
+- `CONNECTED`: Oyuncunun oyuna başarıyla bağlandığını bildirir
+- `ERROR`: Bir hata oluştuğunu bildirir
+- `SYSTEM_MESSAGE`: Sistem mesajlarını bildirir (hoş geldin, duyurular vb.)
+- `PLAYER_JOINED`: Yeni bir oyuncunun oyuna katıldığını bildirir
+- `PLAYER_LEFT`: Bir oyuncunun oyundan ayrıldığını bildirir
+- `VIEWER_COUNT_UPDATE`: İzleyici sayısı güncellemesini bildirir
+
+### Oyun Akışı Mesajları
+
 - `QUESTION`: Yeni soru gönderir
-- `TIME_UPDATE`: Kalan süreyi bildirir
-- `TIME_UP`: Sürenin dolduğunu bildirir
+- `TIME_UPDATE`: Kalan süreyi bildirir (her saniye gönderilir)
+- `TIME_UP`: Sürenin dolduğunu ve doğru cevabın gösterileceğini bildirir
 - `WAITING_NEXT`: Sonraki soruya geçiş süresini bildirir
-- `GAME_RESTART`: Oyunun yeniden başladığını bildirir
-- `ANSWER_RESULT`: Cevap sonucunu bildirir
-- `GAME_OVER`: Oyuncunun oyun dışı kaldığını bildirir
-- `ERROR`: Hata durumlarını bildirir
+- `GAME_RESTART`: Tüm soruların tamamlandığını ve oyunun yeniden başlayacağını bildirir
 
-### İstemciden Gelen Mesajlar
+### Oyuncu Etkileşim Mesajları
 
-- `ANSWER`: Oyuncunun cevabını gönderir
+- `ANSWER`: Oyuncunun soruya cevabını gönderir (istemciden sunucuya)
+- `ANSWER_RESULT`: Cevap sonucunu bildirir (doğru/yanlış)
+- `GAME_OVER`: Oyuncunun canlarının bittiğini ve oyun dışı kaldığını bildirir
+- `CHAT_MESSAGE`: Kullanıcının chat mesajı gönderdiğini bildirir
+- `CHAT_HISTORY`: Tüm chat mesajlarını bildirir
+
+### Skor ve Liste Mesajları
+
+- `SCORE_UPDATE`: Oyuncunun puan durumunu bildirir
+- `ROUND_SCORES`: Tur sonunda puan tablosunu bildirir
+- `GAME_SCORES`: Oyun sonunda genel puan tablosunu bildirir
+- `RECENT_ANSWERS`: Son verilen cevapları bildirir
+- `USER_LIST`: Oyundaki kullanıcı listesini bildirir
+- `PLAYER_LIST_UPDATE`: Oyuncu listesi güncellemesini bildirir
 
 ## Oyun Kuralları
 
