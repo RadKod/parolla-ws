@@ -544,7 +544,7 @@ function handleAnswer(player, answer) {
   
   // Doğru cevapları virgülle ayır ve her birini temizle
   const correctAnswers = gameState.currentQuestion.answer
-    .toLowerCase()
+    .toLocaleLowerCase('tr')
     .split(',')
     .map(ans => ans.trim());
 
