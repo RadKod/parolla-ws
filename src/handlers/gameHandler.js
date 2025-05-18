@@ -540,7 +540,7 @@ function handleAnswer(player, answer) {
   gameState.playerAttempts.set(roundKey, currentAttempts + 1);
   
   // Cevabı küçük harfe çevir ve boşlukları temizle
-  const cleanAnswer = answer.toLowerCase().trim();
+  const cleanAnswer = answer.toLocaleLowerCase('tr').trim();
   
   // Doğru cevapları virgülle ayır ve her birini temizle
   const correctAnswers = gameState.currentQuestion.answer
