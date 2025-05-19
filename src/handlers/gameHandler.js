@@ -450,7 +450,9 @@ function handleTimeUp() {
     if (timeInfo.remaining > 0) {
       const waitingUpdateMsg = {
         type: MessageType.WAITING_NEXT,
-        time: timeInfo
+        time: timeInfo,
+        correctAnswer: gameState.currentQuestion.answer,
+        roundScore: roundScores
       };
       
       broadcast(gameState.wss, waitingUpdateMsg, [], false);
