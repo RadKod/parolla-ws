@@ -67,5 +67,14 @@ module.exports = {
   RECENT_ANSWERS: 'recent_answers',
   
   /** Oyundaki kullanıcı listesini bildirir */
-  USER_LIST: 'user_list'
+  USER_LIST: 'user_list',
+  
+  /** Sadece oyuncu listesi güncellemelerini almak için kullanılan kanal */
+  PLAYER_LIST_CHANNEL: 'player_list_channel',
+  
+  /** Aktif oyuncu listesini bildirir */
+  ACTIVE_PLAYERS: 'active_players',
+  
+  /** İzleyici listesini bildirir */
+  VIEWERS: 'viewers'
 }; 

@@ -9,6 +9,43 @@ const { composeGameEventLog, composeGameStatusLog } = require('../utils/logger')
 const { resetRoundScoring, calculateRoundScores, getGameScores, addRecentAnswer, getRecentAnswers, savePlayerScoreToAPI } = require('../services/scoreService');
 
 /**
+ * Oyuncu listesi kanalına bağlı kullanıcılara güncelleme gönderir
+ */
+function broadcastPlayerListChannel() {
+  if (!gameState.wss) return;
+  
+  const playerList = [];
+  
+  // Oyuncu listesini oluştur
+  for (const [_, player] of gameState.players) {
+    playerList.push({
+      id: player.id,
+      name: player.name,
+      score: player.getTotalScore ? player.getTotalScore() : player.score,
+      lives: player.lives,
+      avatarUrl: player.avatarUrl || null,
+      apiScore: player.score,
+      localScore: player.localScore,
+      isViewer: player._isViewer || false
+    });
+  }
+  
+  // Oyuncu listesini büyükten küçüğe sırala (skora göre)
+  playerList.sort((a, b) => b.score - a.score);
+  
+  const playerListMessage = {
+    type: MessageType.PLAYER_LIST_CHANNEL,
+    players: playerList,
+    totalCount: playerList.length,
+    viewerCount: gameState.viewerCount || 0,
+    timestamp: Date.now()
+  };
+  
+  // Sadece player_list_channel'a bağlı olanlara gönder
+  broadcast(gameState.wss, playerListMessage, [], true, true);
+}
+
+/**
  * Oyundaki kullanıcı listesini client'a gönderir
  */
 function broadcastUserList() {
@@ -55,12 +92,92 @@ function broadcastUserList() {
 }
 
 /**
+ * Aktif oyuncu listesini döndürür
+ * @returns {Array} Aktif oyuncu listesi
+ */
+function getActivePlayers() {
+  const activePlayers = [];
+  
+  for (const [_, player] of gameState.players) {
+    if (!player._isViewer) {
+      activePlayers.push({
+        id: player.id,
+        name: player.name,
+        score: player.getTotalScore ? player.getTotalScore() : player.score,
+        lives: player.lives,
+        avatarUrl: player.avatarUrl || null,
+        apiScore: player.score,
+        localScore: player.localScore,
+        isJustJoined: player.isJustJoined
+      });
+    }
+  }
+  
+  return activePlayers;
+}
+
+/**
+ * Aktif oyuncu listesini broadcast eder
+ */
+function broadcastActivePlayers() {
+  if (!gameState.wss) return;
+  
+  const activePlayers = getActivePlayers();
+  
+  const activePlayersMessage = {
+    type: MessageType.ACTIVE_PLAYERS,
+    players: activePlayers,
+    totalCount: activePlayers.length
+  };
+  
+  // Sadece aktif oyunculara gönder
+  broadcast(gameState.wss, activePlayersMessage, [], false);
+}
+
+/**
+ * İzleyici listesini broadcast eder
+ */
+function broadcastViewers() {
+  if (!gameState.wss) return;
+  
+  const viewers = [];
+  
+  for (const [_, player] of gameState.players) {
+    if (player._isViewer) {
+      viewers.push({
+        id: player.id,
+        name: player.name,
+        avatarUrl: player.avatarUrl || null
+      });
+    }
+  }
+  
+  const viewersMessage = {
+    type: MessageType.VIEWERS,
+    viewers: viewers,
+    totalCount: viewers.length
+  };
+  
+  // Sadece izleyicilere gönder
+  broadcastToViewers(gameState.wss, viewersMessage);
+}
+
+/**
  * Kullanıcı odaya katıldığında listeyi günceller
  * @param {Object} player Oyuncu bilgileri
  */
 function handleUserJoin(player) {
   console.log(`Yeni kullanıcı katıldı: ${player.name} (${player.id})`);
-  broadcastUserList();
+  
+  // Oyuncu listesi kanalını güncelle
+  broadcastPlayerListChannel();
+  
+  // Normal oyun mesajlarını gönder
+  if (player._isViewer) {
+    broadcastViewers();
+  } else {
+    broadcastActivePlayers();
+  }
 }
 
 /**
@@ -69,7 +186,16 @@ function handleUserJoin(player) {
  */
 function handleUserLeave(player) {
   console.log(`Kullanıcı ayrıldı: ${player.name} (${player.id})`);
-  broadcastUserList();
+  
+  // Oyuncu listesi kanalını güncelle
+  broadcastPlayerListChannel();
+  
+  // Normal oyun mesajlarını gönder
+  if (player._isViewer) {
+    broadcastViewers();
+  } else {
+    broadcastActivePlayers();
+  }
 }
 
 /**
@@ -779,5 +905,9 @@ module.exports = {
   startTimeUpdateInterval,
   broadcastUserList,
   handleUserJoin,
-  handleUserLeave
+  handleUserLeave,
+  broadcastActivePlayers,
+  broadcastViewers,
+  getActivePlayers,
+  broadcastPlayerListChannel
 };

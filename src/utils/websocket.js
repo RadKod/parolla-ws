@@ -8,8 +8,9 @@ const Player = require('../models/Player');
  * @param {Object} message Gönderilecek mesaj
  * @param {Array<string>} [excludePlayerIds] Mesajı almayacak oyuncuların ID'leri
  * @param {boolean} [includeViewers=false] İzleyicilere de mesaj gönderilip gönderilmeyeceği
+ * @param {boolean} [playerListChannel=false] Sadece player list channel'a gönderilecek mi
  */
-function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) {
+function broadcast(wss, message, excludePlayerIds = [], includeViewers = false, playerListChannel = false) {
   if (!wss || !wss.clients) {
     console.error('Invalid WebSocket server or no clients');
     return;
@@ -22,6 +23,15 @@ function broadcast(wss, message, excludePlayerIds = [], includeViewers = false) 
     for (const client of clients) {
       try {
         if (client.readyState !== WebSocket.OPEN) {
+          continue;
+        }
+
+        // Player list channel kontrolü
+        if (playerListChannel) {
+          // Sadece player list channel'a bağlı olanlara gönder
+          if (client._playerListChannel) {
+            client.send(jsonMessage);
+          }
           continue;
         }
 

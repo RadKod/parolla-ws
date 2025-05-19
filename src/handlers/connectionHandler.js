@@ -159,6 +159,49 @@ async function handleConnection(wss, ws, req) {
     // URL'den token parametresini al ve temizle
     const { query } = url.parse(req.url, true);
     const token = cleanToken(query.token);
+    const isPlayerListChannel = query.channel === 'player_list';
+
+    // Player list channel bağlantısı
+    if (isPlayerListChannel) {
+      console.log('Player list channel bağlantısı');
+      
+      // Player list channel olduğunu belirt
+      ws._playerListChannel = true;
+      
+      // Ping/Pong mekanizması kur
+      isAlive = true;
+      pingInterval = setInterval(() => {
+        if (!isAlive) {
+          clearInterval(pingInterval);
+          return ws.terminate();
+        }
+        isAlive = false;
+        ws.ping();
+      }, 30000);
+
+      ws.on('pong', () => {
+        isAlive = true;
+      });
+
+      // Bağlantı hatalarını dinle
+      ws.on('error', (error) => {
+        console.error('Player list channel bağlantı hatası:', error);
+        clearInterval(pingInterval);
+        ws.terminate();
+      });
+
+      // Bağlantı kapandığında
+      ws.on('close', () => {
+        clearInterval(pingInterval);
+        ws._playerListChannel = false;
+      });
+
+      // İlk oyuncu listesini gönder
+      const { broadcastPlayerListChannel } = require('./gameHandler');
+      broadcastPlayerListChannel();
+
+      return;
+    }
 
     // Token yoksa veya "undefined" ise izleyici modunda bağlan
     if (!token || token === "undefined") {
